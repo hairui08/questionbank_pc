@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "F:\\原型\\题库系统\\prototype\\feature\\add_user_20251020\\logs\\.b9bff54f5d9658b7afbb1323573e8df3ba624fe0-audit.json",
+    "files": [
+        {
+            "date": 1760941326984,
+            "name": "F:\\原型\\题库系统\\prototype\\feature\\add_user_20251020\\logs\\mcp-puppeteer-2025-10-20.log",
+            "hash": "0aaef4ac5a74eb00ec9896240f5ca00b847d09a80459abe7c6d74f6456fddcba"
+        }
+    ],
+    "hashType": "sha256"
+}

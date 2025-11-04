@@ -1,0 +1,30 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "F:\\原型\\题库系统\\prototype\\logs\\.ee3dfed7994bb28c045d7d1ce51c5409b3bf37f2-audit.json",
+    "files": [
+        {
+            "date": 1760947466960,
+            "name": "F:\\原型\\题库系统\\prototype\\logs\\mcp-puppeteer-2025-10-20.log",
+            "hash": "a272f9d6b1f1bd752cca44bf1cd6f21bffa12e21cd298e65e46d2e745aaad2d3"
+        },
+        {
+            "date": 1761120707971,
+            "name": "F:\\原型\\题库系统\\prototype\\logs\\mcp-puppeteer-2025-10-22.log",
+            "hash": "d9cbb6d1e1433dd208480bcebf95e52989e8cbf25960d2307d1dbe19fe6d6347"
+        },
+        {
+            "date": 1761267997573,
+            "name": "F:\\原型\\题库系统\\prototype\\logs\\mcp-puppeteer-2025-10-24.log",
+            "hash": "047cb59b8f99666be28e0296326a807bf67ce5f3c7bc3b828fd4fcdb1435d363"
+        },
+        {
+            "date": 1761614329707,
+            "name": "F:\\原型\\题库系统\\prototype\\logs\\mcp-puppeteer-2025-10-28.log",
+            "hash": "3c3185d7feccd66890dec3c0465612dd48c4aef2bf813f51f231a5d735d288b8"
+        }
+    ],
+    "hashType": "sha256"
+}

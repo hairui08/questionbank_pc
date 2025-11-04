@@ -1,0 +1,362 @@
+import { ref, computed } from 'vue'
+import { defineStore } from 'pinia'
+import { useProjectStore } from './project'
+import type {
+  LearningStage,
+  LearningStageFormData,
+  ProjectTreeNode,
+  SubjectTreeNode
+} from '@/views/learning-stage-management/types'
+
+export const useLearningStageStore = defineStore('learningStage', () => {
+  const projectStore = useProjectStore()
+
+  // Mock数据：学习阶段列表（与科目关联）
+  const learningStages = ref<LearningStage[]>([
+    // 高级会计师 - 财务战略管理 (s1)
+    {
+      id: 'ls-001',
+      subjectId: 's1',
+      name: '预习阶段',
+      description: '课前预习,熟悉基础概念',
+      sortOrder: 1,
+      creator: '张老师',
+      createdAt: '2025-01-05 09:00',
+      status: 'active'
+    },
+    {
+      id: 'ls-002',
+      subjectId: 's1',
+      name: '课堂学习阶段',
+      description: '课堂讲解,掌握核心知识点',
+      sortOrder: 2,
+      creator: '张老师',
+      createdAt: '2025-01-05 09:05',
+      status: 'active'
+    },
+    {
+      id: 'ls-003',
+      subjectId: 's1',
+      name: '练习巩固阶段',
+      description: '习题练习,巩固所学内容',
+      sortOrder: 3,
+      creator: '张老师',
+      createdAt: '2025-01-05 09:10',
+      status: 'active'
+    },
+    {
+      id: 'ls-004',
+      subjectId: 's1',
+      name: '复习冲刺阶段',
+      description: '考前复习,查漏补缺',
+      sortOrder: 4,
+      creator: '张老师',
+      createdAt: '2025-01-05 09:15',
+      status: 'active'
+    },
+    // 高级会计师 - 税务风险控制 (s2)
+    {
+      id: 'ls-005',
+      subjectId: 's2',
+      name: '基础学习阶段',
+      description: '学习税务风险基础知识',
+      sortOrder: 1,
+      creator: '李老师',
+      createdAt: '2025-01-06 10:00',
+      status: 'active'
+    },
+    {
+      id: 'ls-006',
+      subjectId: 's2',
+      name: '案例分析阶段',
+      description: '通过案例掌握实务应用',
+      sortOrder: 2,
+      creator: '李老师',
+      createdAt: '2025-01-06 10:05',
+      status: 'active'
+    },
+    {
+      id: 'ls-007',
+      subjectId: 's2',
+      name: '综合提升阶段',
+      description: '综合运用,提升解决问题能力',
+      sortOrder: 3,
+      creator: '李老师',
+      createdAt: '2025-01-06 10:10',
+      status: 'active'
+    },
+    // 高级会计师 - 内部控制优化 (s3)
+    {
+      id: 'ls-008',
+      subjectId: 's3',
+      name: '理论学习阶段',
+      description: '学习内部控制理论框架',
+      sortOrder: 1,
+      creator: '王老师',
+      createdAt: '2025-01-07 11:00',
+      status: 'disabled'
+    },
+    // 高级经济师 - 宏观经济分析 (s4)
+    {
+      id: 'ls-009',
+      subjectId: 's4',
+      name: '入门阶段',
+      description: '了解宏观经济基本概念',
+      sortOrder: 1,
+      creator: '赵老师',
+      createdAt: '2025-01-08 14:00',
+      status: 'active'
+    },
+    {
+      id: 'ls-010',
+      subjectId: 's4',
+      name: '深化学习阶段',
+      description: '深入理解经济指标和政策',
+      sortOrder: 2,
+      creator: '赵老师',
+      createdAt: '2025-01-08 14:05',
+      status: 'active'
+    },
+    {
+      id: 'ls-011',
+      subjectId: 's4',
+      name: '实战演练阶段',
+      description: '结合实际案例进行分析',
+      sortOrder: 3,
+      creator: '赵老师',
+      createdAt: '2025-01-08 14:10',
+      status: 'active'
+    },
+    // 中级会计师 - 成本管理实务 (s8)
+    {
+      id: 'ls-012',
+      subjectId: 's8',
+      name: '导学阶段',
+      description: '熟悉成本管理体系',
+      sortOrder: 1,
+      creator: '孙老师',
+      createdAt: '2025-01-10 15:00',
+      status: 'active'
+    },
+    {
+      id: 'ls-013',
+      subjectId: 's8',
+      name: '精讲阶段',
+      description: '精讲重点难点内容',
+      sortOrder: 2,
+      creator: '孙老师',
+      createdAt: '2025-01-10 15:05',
+      status: 'active'
+    },
+    {
+      id: 'ls-014',
+      subjectId: 's8',
+      name: '强化训练阶段',
+      description: '强化练习,提升应试能力',
+      sortOrder: 3,
+      creator: '孙老师',
+      createdAt: '2025-01-10 15:10',
+      status: 'active'
+    },
+    {
+      id: 'ls-015',
+      subjectId: 's8',
+      name: '模拟考试阶段',
+      description: '模拟真实考试环境',
+      sortOrder: 4,
+      creator: '孙老师',
+      createdAt: '2025-01-10 15:15',
+      status: 'active'
+    }
+  ])
+
+  // 构建项目树（与 chapterStore 的 projectTree 结构保持一致）
+  const projectTree = computed<ProjectTreeNode[]>(() => {
+    return projectStore.projects.map((project) => {
+      const projectSubjects = projectStore.subjects.filter(
+        (s) => s.projectId === project.id
+      )
+
+      const subjects: SubjectTreeNode[] = projectSubjects.map((subject) => ({
+        id: subject.id,
+        name: subject.name,
+        type: 'subject'
+      }))
+
+      return {
+        id: project.id,
+        name: project.name,
+        type: 'project',
+        subjects
+      }
+    })
+  })
+
+  // 根据科目ID获取学习阶段列表（已排序）
+  const getLearningStagesBySubject = (subjectId: string) => {
+    return computed(() =>
+      learningStages.value
+        .filter((stage) => stage.subjectId === subjectId)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+    )
+  }
+
+  // 添加学习阶段
+  const addLearningStage = (subjectId: string, data: LearningStageFormData) => {
+    // 检查同科目下是否有重名的学习阶段
+    const exists = learningStages.value.some(
+      (stage) =>
+        stage.subjectId === subjectId &&
+        stage.name === data.name.trim() &&
+        stage.status === 'active'
+    )
+
+    if (exists) {
+      return { success: false, message: '该科目下已存在同名的学习阶段' }
+    }
+
+    // 计算新阶段的排序号（当前科目下最大 sortOrder + 1）
+    const maxSortOrder = learningStages.value
+      .filter((stage) => stage.subjectId === subjectId)
+      .reduce((max, stage) => Math.max(max, stage.sortOrder), 0)
+
+    const newStage: LearningStage = {
+      id: `ls-${Date.now()}`,
+      subjectId,
+      name: data.name.trim(),
+      description: data.description?.trim(),
+      sortOrder: maxSortOrder + 1,
+      creator: '当前用户', // 实际项目中应从登录信息获取
+      createdAt: new Date().toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      status: 'active'
+    }
+
+    learningStages.value.push(newStage)
+    return { success: true, data: newStage }
+  }
+
+  // 编辑学习阶段
+  const updateLearningStage = (id: string, data: LearningStageFormData) => {
+    const stage = learningStages.value.find((s) => s.id === id)
+    if (!stage) {
+      return { success: false, message: '学习阶段不存在' }
+    }
+
+    // 如果修改了名称,检查是否与同科目下其他阶段重名
+    if (data.name.trim() !== stage.name) {
+      const exists = learningStages.value.some(
+        (s) =>
+          s.id !== id &&
+          s.subjectId === stage.subjectId &&
+          s.name === data.name.trim() &&
+          s.status === 'active'
+      )
+
+      if (exists) {
+        return { success: false, message: '该科目下已存在同名的学习阶段' }
+      }
+    }
+
+    stage.name = data.name.trim()
+    stage.description = data.description?.trim()
+
+    return { success: true }
+  }
+
+  // 删除学习阶段
+  const deleteLearningStage = (id: string) => {
+    const index = learningStages.value.findIndex((s) => s.id === id)
+    if (index === -1) {
+      return { success: false, message: '学习阶段不存在' }
+    }
+
+    const deletedStage = learningStages.value[index]
+    learningStages.value.splice(index, 1)
+
+    // 调整同科目下其他阶段的排序号
+    learningStages.value
+      .filter((s) => s.subjectId === deletedStage.subjectId && s.sortOrder > deletedStage.sortOrder)
+      .forEach((s) => {
+        s.sortOrder--
+      })
+
+    return { success: true }
+  }
+
+  // 调整学习阶段排序
+  const updateSortOrder = (id: string, direction: 'up' | 'down') => {
+    const stage = learningStages.value.find((s) => s.id === id)
+    if (!stage) {
+      return { success: false, message: '学习阶段不存在' }
+    }
+
+    // 获取同科目下的所有阶段（已排序）
+    const sameSubjectStages = learningStages.value
+      .filter((s) => s.subjectId === stage.subjectId)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+
+    const currentIndex = sameSubjectStages.findIndex((s) => s.id === id)
+
+    if (direction === 'up' && currentIndex === 0) {
+      return { success: false, message: '已经是第一个' }
+    }
+
+    if (direction === 'down' && currentIndex === sameSubjectStages.length - 1) {
+      return { success: false, message: '已经是最后一个' }
+    }
+
+    // 交换排序号
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    const targetStage = sameSubjectStages[targetIndex]
+
+    const tempOrder = stage.sortOrder
+    stage.sortOrder = targetStage.sortOrder
+    targetStage.sortOrder = tempOrder
+
+    return { success: true }
+  }
+
+  // 切换学习阶段状态
+  const toggleLearningStageStatus = (id: string) => {
+    const stage = learningStages.value.find((s) => s.id === id)
+    if (!stage) {
+      return { success: false, message: '学习阶段不存在' }
+    }
+
+    // 如果是从禁用到启用,检查是否有同科目下同名的启用阶段
+    if (stage.status === 'disabled') {
+      const exists = learningStages.value.some(
+        (s) =>
+          s.id !== id &&
+          s.subjectId === stage.subjectId &&
+          s.name === stage.name &&
+          s.status === 'active'
+      )
+
+      if (exists) {
+        return { success: false, message: '该科目下已存在同名的启用学习阶段,启用失败' }
+      }
+    }
+
+    // 切换状态
+    stage.status = stage.status === 'active' ? 'disabled' : 'active'
+    return { success: true }
+  }
+
+  return {
+    learningStages,
+    projectTree,
+    getLearningStagesBySubject,
+    addLearningStage,
+    updateLearningStage,
+    deleteLearningStage,
+    updateSortOrder,
+    toggleLearningStageStatus
+  }
+})

@@ -1,0 +1,119 @@
+/* 公共样式类 */
+
+/* 按钮样式 */
+.btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn.primary {
+  background: linear-gradient(180deg, #4f77ff 0%, #2f57e3 100%);
+  color: #ffffff;
+  border-color: #375edf;
+  box-shadow: 0 4px 8px rgba(79, 119, 255, 0.3);
+}
+
+.btn.primary:hover {
+  background: linear-gradient(180deg, #4b6ee6 0%, #264acc 100%);
+}
+
+.btn.secondary {
+  background-color: #ffffff;
+  color: var(--accent);
+  border-color: rgba(0, 102, 204, 0.4);
+}
+
+.btn.secondary:hover {
+  background-color: rgba(0, 102, 204, 0.08);
+}
+
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 状态标签 */
+.status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status.is-active {
+  background-color: #ecfff2;
+  color: #2e8b57;
+  border: 1px solid rgba(46, 139, 87, 0.4);
+}
+
+.status.is-disabled {
+  background-color: #fff3f0;
+  color: #cf4a30;
+  border: 1px solid rgba(207, 74, 48, 0.3);
+}
+
+/* 标签 */
+.tag {
+  padding: 4px 12px;
+  border-radius: 20px;
+  background-color: var(--badge-bg);
+  color: var(--badge-text);
+  font-size: 12px;
+}
+
+/* 表单组件 */
+.form-group {
+  display: grid;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: var(--primary-text);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #cdd5e0;
+  font-size: 14px;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* 动画 */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

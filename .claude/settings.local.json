@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//f/原型/题库系统/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
