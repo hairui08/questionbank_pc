@@ -47,29 +47,6 @@
       </div>
     </div>
 
-    <!-- 统计信息 -->
-    <div class="statistics">
-      <div class="stat-item stat-correct">
-        <span class="stat-label">正确</span>
-        <span class="stat-value">{{ statistics.correct }}题</span>
-      </div>
-
-      <div class="stat-item stat-incorrect">
-        <span class="stat-label">错误</span>
-        <span class="stat-value">{{ statistics.incorrect }}题</span>
-      </div>
-
-      <div class="stat-item stat-partial">
-        <span class="stat-label">不全对</span>
-        <span class="stat-value">{{ statistics.partial }}题</span>
-      </div>
-
-      <div class="stat-item stat-unanswered">
-        <span class="stat-label">未作</span>
-        <span class="stat-value">{{ statistics.unanswered }}题</span>
-      </div>
-    </div>
-
     <!-- 提交按钮 -->
     <div class="submit-section">
       <button class="submit-button" @click="handleSubmit">
@@ -267,21 +244,22 @@ function handleSubmit() {
 
 .question-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
 }
 
 .question-number {
-  aspect-ratio: 1;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
 }
 
 /* 未作答状态 */
@@ -299,13 +277,13 @@ function handleSubmit() {
 
 /* 正确状态 */
 .question-number.status-correct {
-  background: rgba(82, 196, 26, 0.12);
+  background: rgba(82, 196, 26, 0.4);
   color: #52c41a;
   border-color: #52c41a;
 }
 
 .question-number.status-correct:hover {
-  background: rgba(82, 196, 26, 0.2);
+  background: rgba(82, 196, 26, 0.5);
 }
 
 /* 错误状态 */
@@ -319,61 +297,21 @@ function handleSubmit() {
   background: rgba(245, 34, 45, 0.2);
 }
 
-/* 部分正确状态 */
+/* 部分正确状态 - 一半灰一半绿 */
 .question-number.status-partial {
-  background: rgba(250, 140, 22, 0.12);
-  color: #fa8c16;
-  border-color: #fa8c16;
+  background: linear-gradient(135deg,
+    #f5f5f5 0%, #f5f5f5 50%,
+    rgba(82, 196, 26, 0.4) 50%, rgba(82, 196, 26, 0.4) 100%
+  );
+  color: #52c41a;
+  border-color: #52c41a;
 }
 
 .question-number.status-partial:hover {
-  background: rgba(250, 140, 22, 0.2);
-}
-
-/* 统计信息 */
-.statistics {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  padding: 16px;
-  border-top: 1px solid #e4eaf2;
-  background: #fafbfc;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.stat-label {
-  font-size: 11px;
-  color: #999;
-}
-
-.stat-value {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.stat-item.stat-correct .stat-value {
-  color: #52c41a;
-}
-
-.stat-item.stat-incorrect .stat-value {
-  color: #f5222d;
-}
-
-.stat-item.stat-partial .stat-value {
-  color: #fa8c16;
-}
-
-.stat-item.stat-unanswered .stat-value {
-  color: #999;
+  background: linear-gradient(135deg,
+    #e8e8e8 0%, #e8e8e8 50%,
+    rgba(82, 196, 26, 0.5) 50%, rgba(82, 196, 26, 0.5) 100%
+  );
 }
 
 /* 提交按钮 */

@@ -6,7 +6,6 @@
 
     <template #body>
       <div class="delete-confirm-content">
-        <div class="warning-icon">⚠️</div>
         <p v-if="isBatch" class="warning-message">
           确认要删除选中的 <strong>{{ count }}</strong> 道试题吗?
         </p>
@@ -61,12 +60,7 @@ function handleCancel() {
 <style scoped>
 .delete-confirm-content {
   text-align: center;
-  padding: 20px;
-}
-
-.warning-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
+  padding: 12px 20px;
 }
 
 .warning-message {

@@ -31,8 +31,14 @@
           <div class="tab-content">
             <!-- 页面标题 -->
             <div class="page-header">
-              <h1 class="page-title">答题记录</h1>
-              <p class="page-subtitle">查看您的做题历史和学习轨迹</p>
+              <button class="back-btn" @click="backToLibrary">
+                <span class="icon">←</span>
+                返回我的题库
+              </button>
+              <div class="page-title-wrapper">
+                <h1 class="page-title">答题记录</h1>
+                <p class="page-subtitle">查看您的做题历史和学习轨迹</p>
+              </div>
             </div>
 
             <!-- 项目和科目筛选 -->
@@ -623,7 +629,12 @@ function formatDate(timestamp: number): string {
 }
 
 function viewRecordDetail(recordId: string) {
-  router.push(`/student/result/${recordId}`)
+  router.push('/student/exam/senior-acc-practice-real-2024')
+}
+
+// 返回我的题库
+function backToLibrary() {
+  router.push({ name: 'StudentPortal' })
 }
 
 // 初始化:选择第一个科目
@@ -641,6 +652,9 @@ if (subjectOptions.value.length > 0) {
   background: #f5f7fa;
   --student-primary: #ff443d;
   --student-primary-dark: #e63a33;
+  --primary-text: #2c3e50;
+  --secondary-text: #5a6c7d;
+  --card-border: #e4eaf2;
 }
 
 /* ============================================================================
@@ -749,12 +763,48 @@ if (subjectOptions.value.length > 0) {
 }
 
 .tab-content {
-  padding: 0;
+  padding: 32px 0;
 }
 
 /* 页面头部 */
 .page-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 24px;
+}
+
+.back-btn {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  background: rgba(255, 68, 61, 0.1);
+  border: 1px solid rgba(255, 68, 61, 0.3);
+  border-radius: 8px;
+  color: var(--student-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: fit-content;
+  margin-top: 2px;
+}
+
+.back-btn:hover {
+  background: rgba(255, 68, 61, 0.15);
+  border-color: var(--student-primary);
+  transform: translateX(-2px);
+}
+
+.back-btn .icon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.page-title-wrapper {
+  flex: 1;
 }
 
 .page-title {
@@ -774,16 +824,15 @@ if (subjectOptions.value.length > 0) {
    筛选器区域(复用"我的题库"样式)
    ============================================================================ */
 .filter-section {
-  padding: 20px;
   background: #ffffff;
   border-radius: 16px;
-  border: 1px solid var(--card-border);
+  padding: 20px;
+  margin-bottom: 16px;
   box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
+  border: 1px solid #e4eaf2;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 20px;
 }
 
 .filter-label {
@@ -825,15 +874,16 @@ if (subjectOptions.value.length > 0) {
 }
 
 .subject-tab {
-  position: relative;
-  padding: 8px 16px;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  color: var(--text-secondary);
+  padding: 10px 24px;
+  background: #ffffff;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--primary-text);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.3s;
+  font-weight: 500;
+  position: relative;
 }
 
 .subject-tab:hover {
@@ -843,6 +893,7 @@ if (subjectOptions.value.length > 0) {
 
 .subject-tab.is-active {
   background: rgba(255, 68, 61, 0.12);
+  border-color: var(--student-primary);
   color: var(--student-primary);
   font-weight: 600;
 }
@@ -868,7 +919,7 @@ if (subjectOptions.value.length > 0) {
   padding: 20px;
   background: #ffffff;
   border-radius: 16px;
-  border: 1px solid var(--card-border);
+  border: 1px solid #e4eaf2;
   box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
   margin-bottom: 24px;
 }
@@ -957,7 +1008,7 @@ if (subjectOptions.value.length > 0) {
   gap: 16px;
   padding: 18px;
   border-radius: 16px;
-  border: 1px solid var(--card-border);
+  border: 1px solid #e4eaf2;
   background: #ffffff;
   cursor: pointer;
   transition: all 0.2s ease;

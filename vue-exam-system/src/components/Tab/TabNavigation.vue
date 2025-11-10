@@ -69,11 +69,10 @@ if (savedTab && props.tabs.some(t => t.key === savedTab)) {
 .tab-navigation {
   display: flex;
   gap: 4px;
-  margin: 24px 0;
+  margin: 0 0 1px 0;
   border-bottom: 1px solid var(--panel-border);
   background: linear-gradient(180deg, #fafafa 0%, #f2f2f2 100%);
   border-radius: 12px 12px 0 0;
-  padding: 8px 8px 0;
 }
 
 .tab-btn {
@@ -121,5 +120,6 @@ if (savedTab && props.tabs.some(t => t.key === savedTab)) {
   border: 1px solid var(--panel-border);
   border-top: none;
   min-height: 600px;
+  padding: 0 22px;
 }
 </style>

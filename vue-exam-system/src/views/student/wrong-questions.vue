@@ -31,8 +31,14 @@
           <div class="tab-content">
             <!-- 页面标题 -->
             <div class="page-header">
-              <h1 class="page-title">我的错题</h1>
-              <p class="page-subtitle">整理错题，巩固知识，提升成绩</p>
+              <button class="back-btn" @click="backToLibrary">
+                <span class="icon">←</span>
+                返回我的题库
+              </button>
+              <div class="page-title-wrapper">
+                <h1 class="page-title">我的错题</h1>
+                <p class="page-subtitle">整理错题，巩固知识，提升成绩</p>
+              </div>
             </div>
 
             <!-- 项目和科目筛选 -->
@@ -67,25 +73,29 @@
               </div>
             </section>
 
-            <!-- 学习阶段筛选 -->
-            <section class="stage-filter">
-              <div class="stage-label">学习阶段：</div>
+            <!-- 章节分类 / 题型分类 -->
+            <section class="filter-chips">
               <button
-                v-for="stage in learningStages"
-                :key="stage.key"
-                :class="['stage-button', { 'is-active': activeStage === stage.key }]"
-                @click="selectStage(stage.key)"
+                v-for="filter in filters"
+                :key="filter.id"
+                type="button"
+                class="chip"
+                :class="{ active: filter.id === activeFilterId }"
+                @click="selectFilter(filter.id)"
               >
-                {{ stage.label }}
+                {{ filter.label }}
               </button>
             </section>
 
             <!-- 列表工具栏 -->
-            <section v-if="filteredQuestions.length > 0" class="list-toolbar">
+            <section
+              v-if="(isChapterFilter && filteredQuestions.length > 0) || (!isChapterFilter && totalTypeCount > 0)"
+              class="list-toolbar"
+            >
               <button class="practice-all-btn" @click="handlePracticeAll">
                 <span class="icon">📝</span>
                 全部错题练习
-                <span class="count">({{ filteredQuestions.length }}题)</span>
+                <span class="count">({{ isChapterFilter ? filteredQuestions.length : totalTypeCount }}题)</span>
               </button>
               <span class="toolbar-hint">将当前筛选的所有错题作为一套试卷进行练习</span>
 
@@ -94,6 +104,85 @@
                 <span class="icon">⚙️</span>
               </button>
             </section>
+
+            <!-- 章节分类：卡片树形展示 -->
+            <template v-if="isChapterFilter">
+              <section
+                v-for="chapter in chapterSummaries"
+                :key="chapter.id"
+                class="chapter-card"
+              >
+                <div class="chapter-main">
+                  <button
+                    type="button"
+                    class="chapter-toggle"
+                    :aria-label="isChapterExpanded(chapter.id) ? '收起章节' : '展开章节'"
+                    @click="toggleChapter(chapter.id)"
+                  >
+                    <span class="chapter-toggle-icon" :class="{ expanded: isChapterExpanded(chapter.id) }" />
+                  </button>
+                  <div class="chapter-title">
+                    <span class="chapter-order">{{ chapter.order }}</span>
+                    <span class="chapter-name">{{ chapter.title }}</span>
+                  </div>
+                </div>
+
+                <transition name="chapter-slide">
+                  <div v-if="isChapterExpanded(chapter.id)" class="chapter-sections">
+                    <div
+                      v-for="sec in chapter.sections"
+                      :key="sec.id"
+                      class="section-item"
+                    >
+                      <div class="section-info" @click="selectChapterNode({ title: sec.title })">
+                        <span class="section-dot" />
+                        <span class="section-title">{{ sec.title }}</span>
+                      </div>
+                      <div class="section-meta">
+                        收藏：<span class="section-count">{{ sec.count }}</span>
+                      </div>
+                      <div class="section-actions">
+                        <button class="btn btn-outline" @click="selectChapterNode({ title: sec.title })">查看</button>
+                        <button class="btn btn-primary" @click="redoByChapter(sec.title)">重新练习</button>
+                      </div>
+                    </div>
+                  </div>
+                </transition>
+
+                <div class="card-footer">
+                  <div class="footer-meta">
+                    收藏：<span class="footer-count">{{ chapter.total }}</span>
+                  </div>
+                  <div class="footer-actions">
+                    <button class="btn btn-outline" @click="redoByChapter(chapter.title)">重新练习</button>
+                    <button class="btn btn-primary" @click="analysisByChapter(chapter.title)">查看解析</button>
+                  </div>
+                </div>
+              </section>
+            </template>
+
+            <!-- 题型分类：列表样式 -->
+            <template v-else>
+              <section class="type-list">
+                <article
+                  v-for="item in typeSummary"
+                  :key="item.id"
+                  class="type-item"
+                >
+                  <div class="type-info">
+                    <div class="type-name">{{ item.label }}</div>
+                    <div class="type-meta">
+                      收藏：
+                      <span class="type-count">{{ item.count }}</span>
+                    </div>
+                  </div>
+                  <div class="type-actions">
+                    <button class="btn btn-outline" @click="redoByType(item.id)">错题重做</button>
+                    <button class="btn btn-primary" @click="analysisByType(item.id)">查看解析</button>
+                  </div>
+                </article>
+              </section>
+            </template>
 
             <!-- 练习设置弹窗 -->
             <BaseModal
@@ -161,361 +250,271 @@
                 </div>
               </div>
             </BaseModal>
-
-            <!-- 错题列表 -->
-            <section class="questions-section">
-              <div v-if="paginatedQuestions.length === 0" class="empty-state">
-                <div class="empty-icon">🎉</div>
-                <p class="empty-text">暂无错题</p>
-                <p class="empty-hint">继续加油，保持优秀！</p>
-              </div>
-
-              <div v-else class="questions-list">
-                <article
-                  v-for="(question, index) in paginatedQuestions"
-                  :key="question.id"
-                  class="question-item"
-                >
-                  <div class="question-main">
-                    <div class="question-number">{{ getQuestionNumber(index) }}</div>
-                    <div class="question-content">
-                      <div class="question-stem">{{ getTruncatedStem(question.stem) }}</div>
-                      <div class="question-meta">
-                        <span class="meta-item">
-                          <span class="meta-icon">📅</span>
-                          {{ formatDate(question.wrongTime) }}
-                        </span>
-                        <span class="divider">·</span>
-                        <span class="meta-item">
-                          <span class="meta-icon">{{ getSourceIcon(question.sourceType) }}</span>
-                          {{ question.sourceName }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="question-actions">
-                    <button class="practice-btn" @click="handlePractice(question.questionId)">
-                      重新练习
-                      <span class="arrow">→</span>
-                    </button>
-                    <button class="remove-btn" @click="handleRemove(question.id)">
-                      移除错题
-                      <span class="icon">×</span>
-                    </button>
-                  </div>
-                </article>
-              </div>
-            </section>
-
-            <!-- 分页组件 -->
-            <Pagination
-              v-if="totalQuestions > 0"
-              :current-page="currentPage"
-              :total="totalQuestions"
-              :page-size="pageSize"
-              @page-change="handlePageChange"
-              @size-change="handlePageSizeChange"
-            />
           </div>
         </template>
 
         <!-- 需求文档标签页 -->
         <template #requirements>
-          <div class="requirements-section">
-            <h2>功能需求</h2>
+          <div class="requirements-container">
+            <h2 class="requirements-title">功能需求</h2>
 
-            <h3>1. 功能概述</h3>
-            <table class="spec-table">
-              <thead>
-                <tr>
-                  <th>项目</th>
-                  <th>说明</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>功能名称</td>
-                  <td>我的错题</td>
-                </tr>
-                <tr>
-                  <td>功能描述</td>
-                  <td>学员查看自己的错题记录，支持按项目、科目、学习阶段筛选，可重新练习错题</td>
-                </tr>
-                <tr>
-                  <td>用户角色</td>
-                  <td>学员</td>
-                </tr>
-                <tr>
-                  <td>访问路径</td>
-                  <td>学习中心 → 我的题库 → 点击"我的错题"统计卡片</td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- 1. 功能概述 -->
+            <section class="req-section">
+              <h3 class="req-section-title">1. 功能概述</h3>
+              <div class="table-card">
+                <div class="table-header header-primary">项目概述</div>
+                <table class="req-table">
+                  <tbody>
+                    <tr>
+                      <td class="col-key">功能名称</td>
+                      <td class="col-val">我的错题</td>
+                    </tr>
+                    <tr>
+                      <td class="col-key">页面路径</td>
+                      <td class="col-val">/student/wrong-questions</td>
+                    </tr>
+                    <tr>
+                      <td class="col-key">功能描述</td>
+                      <td class="col-val">学员查看自己的错题记录，支持按项目、科目、学习阶段筛选，可重新练习错题</td>
+                    </tr>
+                    <tr>
+                      <td class="col-key">用户角色</td>
+                      <td class="col-val">学员</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-            <h3>2. 功能规格</h3>
-            <table class="spec-table">
-              <thead>
-                <tr>
-                  <th>功能点</th>
-                  <th>详细说明</th>
-                  <th>优先级</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>筛选器</td>
-                  <td>
-                    - 项目下拉选择器<br>
-                    - 科目横向标签页<br>
-                    - 学习阶段按钮组（全部、章节练习、历年真题、考前冲刺、入学测试）
-                  </td>
-                  <td>P0</td>
-                </tr>
-                <tr>
-                  <td>错题卡片</td>
-                  <td>
-                    - 题目序号（第N题）<br>
-                    - 题干内容（最多100字）<br>
-                    - 答错时间（YYYY-MM-DD HH:mm）<br>
-                    - 来源信息（试卷名称或章节名称）
-                  </td>
-                  <td>P0</td>
-                </tr>
-                <tr>
-                  <td>全部错题练习</td>
-                  <td>
-                    - 位置：错题列表上方的工具栏<br>
-                    - 功能：将当前筛选的所有错题作为一套试卷进行练习<br>
-                    - 显示题目数量：(X题)<br>
-                    - 跳转到答题页面 (/student/exam/:id)
-                  </td>
-                  <td>P0</td>
-                </tr>
-                <tr>
-                  <td>单题重新练习</td>
-                  <td>
-                    - 点击"重新练习"按钮，跳转到答题页面<br>
-                    - 从该题开始，可通过"下一题"继续做后续错题<br>
-                    - 实现顺序练习模式
-                  </td>
-                  <td>P0</td>
-                </tr>
-                <tr>
-                  <td>移除错题</td>
-                  <td>点击"移除错题"按钮，从错题本中移除该题目</td>
-                  <td>P0</td>
-                </tr>
-                <tr>
-                  <td>分页</td>
-                  <td>支持分页显示，默认每页10条，可选10/20/50条</td>
-                  <td>P0</td>
-                </tr>
-                <tr>
-                  <td>空状态</td>
-                  <td>无错题时显示友好提示"暂无错题，继续加油！"</td>
-                  <td>P1</td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- 2. 核心功能规格 -->
+            <section class="req-section">
+              <h3 class="req-section-title">2. 核心功能规格</h3>
+              <div class="table-card">
+                <div class="table-header header-primary">功能规格</div>
+                <table class="req-table">
+                  <thead>
+                    <tr>
+                      <th>功能点</th>
+                      <th>详细说明</th>
+                      <th>优先级</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>筛选器</td>
+                      <td>项目下拉选择器、科目横向标签页、学习阶段按钮组（全部、章节练习、历年真题、考前冲刺、入学测试）</td>
+                      <td>P0</td>
+                    </tr>
+                    <tr>
+                      <td>错题卡片</td>
+                      <td>题目序号（第N题）、题干（≤100字）、答错时间（YYYY-MM-DD HH:mm）、来源（试卷或章节）</td>
+                      <td>P0</td>
+                    </tr>
+                    <tr>
+                      <td>全部错题练习</td>
+                      <td>列表上方工具栏，显示题目数量；将筛选后的错题作为试卷练习</td>
+                      <td>P0</td>
+                    </tr>
+                    <tr>
+                      <td>单题重新练习</td>
+                      <td>从该题开始答题，可通过“下一题”继续做后续错题，顺序练习模式</td>
+                      <td>P0</td>
+                    </tr>
+                    <tr>
+                      <td>移除错题</td>
+                      <td>点击“移除错题”后从错题本中移除该题目</td>
+                      <td>P0</td>
+                    </tr>
+                    <tr>
+                      <td>分页</td>
+                      <td>每页10条，支持10/20/50条选项</td>
+                      <td>P0</td>
+                    </tr>
+                    <tr>
+                      <td>空状态</td>
+                      <td>无错题时显示提示“暂无错题，继续加油！”</td>
+                      <td>P1</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-            <h3>3. 数据约束</h3>
-            <table class="constraint-table">
-              <thead>
-                <tr>
-                  <th>字段</th>
-                  <th>约束</th>
-                  <th>说明</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>题干显示</td>
-                  <td>≤ 100 字符</td>
-                  <td>超出部分显示省略号（...）</td>
-                </tr>
-                <tr>
-                  <td>日期格式</td>
-                  <td>YYYY-MM-DD HH:mm</td>
-                  <td>如：2024-10-30 14:30</td>
-                </tr>
-                <tr>
-                  <td>来源类型</td>
-                  <td>exam（试卷）或 chapter（章节）</td>
-                  <td>显示对应图标和名称</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <h3>4. 验收标准</h3>
-            <table class="acceptance-criteria">
-              <thead>
-                <tr>
-                  <th>验收项</th>
-                  <th>标准</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>页面布局</td>
-                  <td>顶部导航栏 + 页面标题 + 筛选器 + 错题列表 + 分页</td>
-                </tr>
-                <tr>
-                  <td>筛选功能</td>
-                  <td>项目、科目、学习阶段三级联动筛选正常工作</td>
-                </tr>
-                <tr>
-                  <td>卡片展示</td>
-                  <td>每个错题卡片显示序号、题干（≤100字）、时间、来源</td>
-                </tr>
-                <tr>
-                  <td>列表工具栏</td>
-                  <td>"全部错题练习"按钮显示在错题列表上方，显示题目数量</td>
-                </tr>
-                <tr>
-                  <td>全部错题练习</td>
-                  <td>点击后跳转到答题页面，可顺序练习所有筛选后的错题</td>
-                </tr>
-                <tr>
-                  <td>单题重新练习</td>
-                  <td>点击"重新练习"后，从该题开始答题，可通过"下一题"继续做后续错题</td>
-                </tr>
-                <tr>
-                  <td>按钮样式</td>
-                  <td>"重新练习"和"全部错题练习"按钮均为红色渐变胶囊按钮</td>
-                </tr>
-                <tr>
-                  <td>分页功能</td>
-                  <td>分页组件正常工作，筛选变更时重置到第1页</td>
-                </tr>
-                <tr>
-                  <td>空状态</td>
-                  <td>无错题时显示友好的空状态提示</td>
-                </tr>
-                <tr>
-                  <td>响应式设计</td>
-                  <td>移动端（≤768px）布局调整，卡片垂直排列</td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- 3. 验收标准 -->
+            <section class="req-section">
+              <h3 class="req-section-title">3. 验收标准</h3>
+              <div class="table-card">
+                <div class="table-header header-danger">验收标准</div>
+                <table class="req-table checklist-table">
+                  <thead>
+                    <tr>
+                      <th>优先级</th>
+                      <th>验收标准</th>
+                      <th>状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>P0</td>
+                      <td>页面布局：顶部导航栏 + 页面标题 + 筛选器 + 错题列表 + 分页</td>
+                      <td><span class="status-ok">✔</span></td>
+                    </tr>
+                    <tr>
+                      <td>P0</td>
+                      <td>筛选功能：项目、科目、学习阶段三级联动正常工作</td>
+                      <td><span class="status-ok">✔</span></td>
+                    </tr>
+                    <tr>
+                      <td>P0</td>
+                      <td>卡片展示：题干（≤100字）、时间、来源信息</td>
+                      <td><span class="status-ok">✔</span></td>
+                    </tr>
+                    <tr>
+                      <td>P0</td>
+                      <td>工具栏：显示“全部错题练习”按钮与数量</td>
+                      <td><span class="status-ok">✔</span></td>
+                    </tr>
+                    <tr>
+                      <td>P0</td>
+                      <td>单题重做：从该题开始顺序练习后续错题</td>
+                      <td><span class="status-ok">✔</span></td>
+                    </tr>
+                    <tr>
+                      <td>P0</td>
+                      <td>分页：筛选变更重置第1页，交互正常</td>
+                      <td><span class="status-ok">✔</span></td>
+                    </tr>
+                    <tr>
+                      <td>P1</td>
+                      <td>空状态：无错题时显示友好提示</td>
+                      <td><span class="status-ok">✔</span></td>
+                    </tr>
+                    <tr>
+                      <td>P1</td>
+                      <td>响应式：移动端（≤768px）卡片垂直排列</td>
+                      <td><span class="status-ok">✔</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         </template>
 
         <!-- 样式指南标签页 -->
         <template #style-guide>
           <div class="style-guide-section">
-            <h2>样式规范</h2>
+            <h2 class="sg-title">样式指南</h2>
 
-            <h3>1. 颜色系统</h3>
-            <div class="color-palette">
-              <div class="color-item">
-                <div class="color-swatch" style="background: #ff443d"></div>
-                <div class="color-info">
-                  <div class="color-name">主色</div>
-                  <div class="color-value">#ff443d</div>
-                  <div class="color-usage">按钮、链接、强调元素</div>
-                </div>
+            <!-- 1. 顶部导航条 -->
+            <section class="sg-section">
+              <h3 class="sg-section-title">1. 顶部导航条</h3>
+              <div class="sg-table-card">
+                <div class="sg-table-header header-gradient">属性与规范</div>
+                <table class="sg-table">
+                  <thead>
+                    <tr>
+                      <th>属性</th>
+                      <th>规范</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>高度</td>
+                      <td>60px</td>
+                    </tr>
+                    <tr>
+                      <td>背景色</td>
+                      <td>白色 #ffffff</td>
+                    </tr>
+                    <tr>
+                      <td>阴影</td>
+                      <td>0 2px 8px rgba(0,0,0,0.1)</td>
+                    </tr>
+                    <tr>
+                      <td>品牌Logo</td>
+                      <td>红色渐变背景，40x40px 圆形</td>
+                    </tr>
+                    <tr>
+                      <td>激活链接</td>
+                      <td>红色文字 + 下划线</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div class="color-item">
-                <div class="color-swatch" style="background: linear-gradient(135deg, #ff443d 0%, #ff6659 100%)"></div>
-                <div class="color-info">
-                  <div class="color-name">主色渐变</div>
-                  <div class="color-value">#ff443d → #ff6659</div>
-                  <div class="color-usage">按钮背景、卡片高亮</div>
-                </div>
-              </div>
-              <div class="color-item">
-                <div class="color-swatch" style="background: #2c3e50"></div>
-                <div class="color-info">
-                  <div class="color-name">主文本</div>
-                  <div class="color-value">#2c3e50</div>
-                  <div class="color-usage">标题、正文</div>
-                </div>
-              </div>
-              <div class="color-item">
-                <div class="color-swatch" style="background: #5a6c7d"></div>
-                <div class="color-info">
-                  <div class="color-name">辅助文本</div>
-                  <div class="color-value">#5a6c7d</div>
-                  <div class="color-usage">说明文字、元信息</div>
-                </div>
-              </div>
-            </div>
+            </section>
 
-            <h3>2. 组件样式</h3>
-            <table class="style-table">
-              <thead>
-                <tr>
-                  <th>组件</th>
-                  <th>样式规范</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>列表工具栏</td>
-                  <td>
-                    - 背景：淡红色渐变 (linear-gradient(135deg, #fff5f5 0%, #ffe9e9 100%))<br>
-                    - 边框：1px solid #ffcccb<br>
-                    - 圆角：16px<br>
-                    - 内边距：16px 20px<br>
-                    - 按钮：红色渐变胶囊按钮，显示题目数量
-                  </td>
-                </tr>
-                <tr>
-                  <td>错题卡片</td>
-                  <td>
-                    - 白色背景，圆角16px<br>
-                    - 边框：1px solid #e4eaf2<br>
-                    - 阴影：0 12px 24px rgba(17, 36, 80, 0.06)<br>
-                    - 悬停：边框色变为 #ff443d
-                  </td>
-                </tr>
-                <tr>
-                  <td>重新练习按钮</td>
-                  <td>
-                    - 红色渐变背景（#ff443d → #ff6659）<br>
-                    - 白色文字，圆角50px（胶囊形）<br>
-                    - 内边距：6px 16px<br>
-                    - 悬停：transform: translateY(-2px)
-                  </td>
-                </tr>
-                <tr>
-                  <td>筛选器</td>
-                  <td>
-                    - 项目选择器：白色背景，圆角8px<br>
-                    - 科目标签：横向排列，圆角8px<br>
-                    - 学习阶段：按钮组，圆角8px
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- 2. 记录卡片（横向布局） -->
+            <section class="sg-section">
+              <h3 class="sg-section-title">2. 记录卡片（横向布局）</h3>
+              <div class="sg-table-card">
+                <div class="sg-table-header header-gradient">属性与规范</div>
+                <table class="sg-table">
+                  <thead>
+                    <tr>
+                      <th>属性</th>
+                      <th>规范</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>布局</td>
+                      <td>flex 横向，左侧信息区 + 右侧按钮区</td>
+                    </tr>
+                    <tr>
+                      <td>圆角</td>
+                      <td>14px</td>
+                    </tr>
+                    <tr>
+                      <td>边框</td>
+                      <td>1px solid rgba(0,0,0,0.08)</td>
+                    </tr>
+                    <tr>
+                      <td>hover 效果</td>
+                      <td>边框变红 + 背景 #fafafa + 阴影增强</td>
+                    </tr>
+                    <tr>
+                      <td>主按钮</td>
+                      <td>红色渐变胶囊（border-radius: 50px）</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-            <h3>3. 间距规范</h3>
-            <table class="style-table">
-              <thead>
-                <tr>
-                  <th>元素</th>
-                  <th>间距值</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>页面标题与筛选器</td>
-                  <td>32px</td>
-                </tr>
-                <tr>
-                  <td>筛选器与错题列表</td>
-                  <td>24px</td>
-                </tr>
-                <tr>
-                  <td>错题卡片之间</td>
-                  <td>16px</td>
-                </tr>
-                <tr>
-                  <td>卡片内边距</td>
-                  <td>18px</td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- 3. 分页组件 -->
+            <section class="sg-section">
+              <h3 class="sg-section-title">3. 分页组件</h3>
+              <div class="sg-table-card">
+                <div class="sg-table-header header-gradient">属性与规范</div>
+                <table class="sg-table">
+                  <thead>
+                    <tr>
+                      <th>属性</th>
+                      <th>规范</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>位置</td>
+                      <td>列表底部，居中对齐</td>
+                    </tr>
+                    <tr>
+                      <td>按钮间隔</td>
+                      <td>8px</td>
+                    </tr>
+                    <tr>
+                      <td>激活项</td>
+                      <td>红色渐变边框</td>
+                    </tr>
+                    <tr>
+                      <td>hover 效果</td>
+                      <td>红色边框</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         </template>
       </TabNavigation>
@@ -548,19 +547,26 @@ const tabs = [
   { key: 'style-guide', label: '样式指南', icon: '🎯' }
 ]
 
-// 学习阶段
-const learningStages = [
-  { key: 'all', label: '全部' },
-  { key: 'chapter', label: '章节练习' },
-  { key: 'realExam', label: '历年真题' },
-  { key: 'sprint', label: '考前冲刺' },
-  { key: 'entrance', label: '入学测试' }
+// 顶部切换（章节分类 / 题型分类）
+interface FilterChip { id: 'chapter' | 'type'; label: string }
+const filters: FilterChip[] = [
+  { id: 'chapter', label: '章节分类' },
+  { id: 'type', label: '题型分类' },
 ]
+const activeFilterId = ref<FilterChip['id']>('type')
+const isChapterFilter = computed(() => activeFilterId.value === 'chapter')
+const isTypeFilter = computed(() => activeFilterId.value === 'type')
+function selectFilter(id: FilterChip['id']) {
+  activeFilterId.value = id
+  activeTypeId.value = ''
+  activeChapterTitle.value = ''
+  expandedChapterIds.value = new Set<string>()
+  currentPage.value = 1
+}
 
 // 筛选状态
 const activeProjectId = ref(projectStore.projects[0]?.id || '')
 const activeSubjectId = ref('')
-const activeStage = ref('all')
 
 // 分页状态
 const currentPage = ref(1)
@@ -595,7 +601,8 @@ watch(
   () => projects.value,
   () => {
     if (subjectOptions.value.length > 0 && !activeSubjectId.value) {
-      activeSubjectId.value = subjectOptions.value[0].id
+      // 修复：subjectOptions[0] 可能为未定义
+      activeSubjectId.value = subjectOptions.value[0]?.id ?? ''
     }
   },
   { immediate: true }
@@ -701,7 +708,112 @@ const allQuestions = ref([
   }
 ])
 
-// 筛选后的错题
+// 题型枚举与汇总
+type QuestionTypeId = 'single' | 'multiple' | 'judge' | 'fill' | 'essay'
+const questionTypes = [
+  { id: 'single' as QuestionTypeId, label: '单选题' },
+  { id: 'multiple' as QuestionTypeId, label: '多选题' },
+  { id: 'judge' as QuestionTypeId, label: '判断题' },
+  { id: 'fill' as QuestionTypeId, label: '填空题' },
+  { id: 'essay' as QuestionTypeId, label: '简答题' },
+]
+const activeTypeId = ref<QuestionTypeId | ''>('')
+
+const typeSummary = computed(() => {
+  const base = allQuestions.value.filter(q => {
+    if (activeProjectId.value && q.projectId !== activeProjectId.value) return false
+    if (activeSubjectId.value && q.subjectId !== activeSubjectId.value) return false
+    return true
+  })
+  const counts: Record<QuestionTypeId, number> = { single: 0, multiple: 0, judge: 0, fill: 0, essay: 0 }
+  base.forEach(q => {
+    const t = q.type as QuestionTypeId
+    if (t in counts) counts[t] += 1
+  })
+  return questionTypes.map(t => ({ ...t, count: counts[t.id] }))
+})
+
+function redoByType(typeId: QuestionTypeId) {
+  activeFilterId.value = 'type'
+  activeTypeId.value = typeId
+  currentPage.value = 1
+  router.push('/student/exam/senior-acc-practice-real-2024')
+}
+
+function analysisByType(typeId: QuestionTypeId) {
+  // 设置筛选状态，显示该题型的错题列表
+  activeFilterId.value = 'type'
+  activeTypeId.value = typeId
+  currentPage.value = 1
+  router.push('/student/exam/senior-acc-practice-real-2024')
+}
+
+// 章节树（章、节）
+interface ChapterSection { id: string; title: string; count?: number }
+interface ChapterNode { id: string; order: string; title: string; sections?: ChapterSection[] }
+const chapters = ref<ChapterNode[]>([
+  { id: 'c-1', order: '第一章', title: '职业理念', sections: [
+    { id: 'c-1-1', title: '第一节 社会工作的内涵' },
+    { id: 'c-1-2', title: '第二节 社会工作的基本原则' },
+    { id: 'c-1-3', title: '第三节 社会工作的主要领域' },
+  ]},
+  { id: 'c-2', order: '第二章', title: '教育心理', sections: [
+    { id: 'c-2-1', title: '第一节 学习动机' },
+    { id: 'c-2-2', title: '第二节 记忆与认知' },
+  ]},
+  { id: 'c-3', order: '第三章', title: 'CSS定位与布局', sections: [
+    { id: 'c-3-1', title: '第一节 CSS定位基础' },
+    { id: 'c-3-2', title: '第二节 布局与应用' },
+  ]},
+])
+
+const expandedChapterIds = ref(new Set<string>())
+const isChapterExpanded = (id: string) => expandedChapterIds.value.has(id)
+function toggleChapter(id: string) {
+  const next = new Set(expandedChapterIds.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  expandedChapterIds.value = next
+}
+const activeChapterTitle = ref('')
+function selectChapterNode(node: { title?: string }) {
+  if (!node?.title) return
+  activeChapterTitle.value = node.title
+  currentPage.value = 1
+}
+
+function redoByChapter(title: string) {
+  activeFilterId.value = 'chapter'
+  activeChapterTitle.value = title
+  currentPage.value = 1
+  router.push('/student/exam/senior-acc-practice-real-2024')
+}
+
+function analysisByChapter(title: string) {
+  // 设置筛选状态，显示该章节的错题列表
+  activeFilterId.value = 'chapter'
+  activeChapterTitle.value = title
+  currentPage.value = 1
+  router.push('/student/exam/senior-acc-practice-real-2024')
+}
+
+// 章节汇总（统计当前项目/科目下各节的收藏/错题数量）
+const chapterSummaries = computed(() => {
+  const base = allQuestions.value.filter(q => {
+    if (activeProjectId.value && q.projectId !== activeProjectId.value) return false
+    if (activeSubjectId.value && q.subjectId !== activeSubjectId.value) return false
+    return q.sourceType === 'chapter'
+  })
+  return chapters.value.map(ch => {
+    const sections = (ch.sections ?? []).map(sec => {
+      const count = base.filter(q => String(q.sourceName).includes(sec.title)).length
+      return { ...sec, count }
+    })
+    const total = sections.reduce((sum, s) => sum + (s.count ?? 0), 0)
+    return { ...ch, sections, total }
+  })
+})
+
+// 筛选后的错题（加入题型/章节过滤）
 const filteredQuestions = computed(() => {
   let result = allQuestions.value
 
@@ -713,8 +825,15 @@ const filteredQuestions = computed(() => {
     result = result.filter(q => q.subjectId === activeSubjectId.value)
   }
 
-  if (activeStage.value !== 'all') {
-    result = result.filter(q => q.examType === activeStage.value)
+  if (isTypeFilter.value && activeTypeId.value) {
+    result = result.filter(q => q.type === activeTypeId.value)
+  }
+
+  if (isChapterFilter.value) {
+    result = result.filter(q => q.sourceType === 'chapter')
+    if (activeChapterTitle.value) {
+      result = result.filter(q => String(q.sourceName).includes(activeChapterTitle.value))
+    }
   }
 
   return result
@@ -727,26 +846,36 @@ const paginatedQuestions = computed(() => {
   return filteredQuestions.value.slice(start, end)
 })
 
+// 题型分类总数（用于工具栏显示）
+const totalTypeCount = computed(() => {
+  try {
+    return (Array.isArray(typeSummary.value) ? typeSummary.value : []).reduce((sum, item: any) => {
+      const c = typeof item?.count === 'number' ? item.count : 0
+      return sum + c
+    }, 0)
+  } catch {
+    return 0
+  }
+})
+
 // 总错题数
 const totalQuestions = computed(() => filteredQuestions.value.length)
 
 // 项目变更处理
 function handleProjectChange() {
   activeSubjectId.value = subjectOptions.value[0]?.id || ''
-  activeStage.value = 'all'
+  activeTypeId.value = ''
+  activeChapterTitle.value = ''
+  expandedChapterIds.value = new Set<string>()
   currentPage.value = 1
 }
 
 // 科目选择
 function selectSubject(subjectId: string) {
   activeSubjectId.value = subjectId
-  activeStage.value = 'all'
-  currentPage.value = 1
-}
-
-// 学习阶段选择
-function selectStage(stage: string) {
-  activeStage.value = stage
+  activeTypeId.value = ''
+  activeChapterTitle.value = ''
+  expandedChapterIds.value = new Set<string>()
   currentPage.value = 1
 }
 
@@ -900,6 +1029,8 @@ function handleRemove(id: string) {
   const index = allQuestions.value.findIndex(q => q.id === id)
   if (index > -1) {
     const question = allQuestions.value[index]
+    // 修复：question 可能为未定义
+    if (!question) return
     if (confirm(`确定要移除错题"${getTruncatedStem(question.stem)}"吗？`)) {
       allQuestions.value.splice(index, 1)
       console.log(`已移除错题 ${id}`)
@@ -912,15 +1043,24 @@ function handleRemove(id: string) {
   }
 }
 
+// 返回我的题库
+function backToLibrary() {
+  router.push({ name: 'StudentPortal' })
+}
+
 // 监听筛选变化，重置分页
 watch(activeProjectId, () => {
   activeSubjectId.value = subjectOptions.value[0]?.id || ''
-  activeStage.value = 'all'
+  activeTypeId.value = ''
+  activeChapterTitle.value = ''
+  expandedChapterIds.value = new Set<string>()
   currentPage.value = 1
 })
 
 watch(activeSubjectId, () => {
-  activeStage.value = 'all'
+  activeTypeId.value = ''
+  activeChapterTitle.value = ''
+  expandedChapterIds.value = new Set<string>()
   currentPage.value = 1
 })
 
@@ -1056,13 +1196,48 @@ onUnmounted(() => {
 }
 
 .tab-content {
-  padding: 32px 0;
+  padding: 32px 0 0;
 }
 
 /* 页面标题 */
 .page-header {
-  text-align: center;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 24px;
+}
+
+.back-btn {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  background: rgba(255, 68, 61, 0.1);
+  border: 1px solid rgba(255, 68, 61, 0.3);
+  border-radius: 8px;
+  color: var(--student-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: fit-content;
+  margin-top: 2px;
+}
+
+.back-btn:hover {
+  background: rgba(255, 68, 61, 0.15);
+  border-color: var(--student-primary);
+  transform: translateX(-2px);
+}
+
+.back-btn .icon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.page-title-wrapper {
+  flex: 1;
 }
 
 .page-title {
@@ -1166,17 +1341,9 @@ onUnmounted(() => {
   border-radius: 2px 2px 0 0;
 }
 
-/* 学习阶段筛选 */
+/* 学习阶段筛选 已替换为 chips + 章节/题型视图 */
 .stage-filter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 20px;
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
-  margin-bottom: 24px;
+  display: none;
 }
 
 /* 列表工具栏 */
@@ -1349,451 +1516,341 @@ onUnmounted(() => {
   box-shadow: 0 16px 32px rgba(17, 36, 80, 0.08);
 }
 
-.question-main {
-  flex: 1;
+/* 筛选 chips */
+.filter-chips {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-}
-
-.question-number {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #ff443d 0%, #ff6659 100%);
-  color: white;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.question-content {
-  flex: 1;
-}
-
-.question-stem {
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--primary-text);
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.question-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--secondary-text);
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.meta-icon {
-  font-size: 16px;
-}
-
-.divider {
-  color: #d0d5dd;
-}
-
-.question-actions {
-  flex-shrink: 0;
-  display: flex;
-  gap: 12px;
-}
-
-.practice-btn {
-  padding: 6px 16px;
-  background: linear-gradient(135deg, #ff443d 0%, #ff6659 100%);
-  color: white;
-  border: none;
-  border-radius: 50px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  box-shadow: 0 4px 12px rgba(255, 68, 61, 0.2);
-}
-
-.practice-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(255, 68, 61, 0.3);
-}
-
-.practice-btn .arrow {
-  font-size: 13px;
-  font-weight: bold;
-}
-
-.remove-btn {
-  padding: 6px 16px;
-  background: white;
-  color: var(--secondary-text);
-  border: 1px solid #d0d5dd;
-  border-radius: 50px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.remove-btn:hover {
-  border-color: #f56565;
-  color: #f56565;
-  transform: translateY(-2px);
-}
-
-.remove-btn .icon {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-/* 需求文档样式 */
-.requirements-section,
-.style-guide-section {
-  padding: 40px;
+  padding: 14px 20px;
   background: #ffffff;
   border-radius: 16px;
-  box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
-}
-
-.requirements-section h2,
-.style-guide-section h2 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--primary-text);
-  margin: 0 0 24px 0;
-  border-bottom: 3px solid var(--student-primary);
-  padding-bottom: 12px;
-}
-
-.requirements-section h3,
-.style-guide-section h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--primary-text);
-  margin: 32px 0 16px 0;
-}
-
-.requirements-section table,
-.style-guide-section table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 24px;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.spec-table thead,
-.constraint-table thead {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.spec-table th,
-.constraint-table th {
-  padding: 16px;
-  text-align: left;
-  font-weight: 700;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-size: 14px;
-}
-
-.acceptance-criteria thead {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-}
-
-.acceptance-criteria th {
-  padding: 16px;
-  text-align: left;
-  font-weight: 700;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-size: 14px;
-}
-
-.requirements-section td,
-.style-guide-section td {
-  padding: 14px 16px;
-  border-bottom: 1px solid #e4eaf2;
-  color: var(--primary-text);
-  line-height: 1.6;
-}
-
-.requirements-section tbody tr:last-child td,
-.style-guide-section tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.requirements-section tbody tr:hover,
-.style-guide-section tbody tr:hover {
-  background: #f8f9fb;
-}
-
-/* 颜色样板 */
-.color-palette {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-.color-item {
   border: 1px solid var(--card-border);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
+  margin-bottom: 24px;
 }
-
-.color-swatch {
-  height: 120px;
-}
-
-.color-info {
-  padding: 16px;
-  background: #ffffff;
-}
-
-.color-name {
-  font-weight: 700;
-  color: var(--primary-text);
-  margin-bottom: 4px;
-}
-
-.color-value {
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-  color: var(--secondary-text);
-  margin-bottom: 8px;
-}
-
-.color-usage {
-  font-size: 13px;
-  color: var(--secondary-text);
-  font-style: italic;
-}
-
-.style-table thead {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.style-table th {
-  padding: 16px;
-  text-align: left;
-  font-weight: 700;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.chip {
+  padding: 8px 16px;
+  border: 1px solid var(--card-border);
+  background: #fff;
+  border-radius: 20px;
   font-size: 14px;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .navbar-content {
-    padding: 0 16px;
-  }
-
-  .nav-menu {
-    display: none;
-  }
-
-  .main-content {
-    padding: 20px 16px;
-  }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .page-subtitle {
-    font-size: 14px;
-  }
-
-  .filter-section {
-    padding: 16px;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .filter-label {
-    width: 100%;
-  }
-
-  .project-select {
-    width: 100%;
-    min-width: auto;
-  }
-
-  .subject-tabs {
-    width: 100%;
-  }
-
-  .stage-filter {
-    flex-wrap: wrap;
-  }
-
-  .question-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .question-actions {
-    width: 100%;
-    flex-direction: column;
-  }
-
-  .practice-btn,
-  .remove-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .requirements-section,
-  .style-guide-section {
-    padding: 20px;
-  }
-}
-
-/* 设置弹窗样式 */
-.settings-content {
-  padding: 24px 0;
-}
-
-.setting-group {
-  margin-bottom: 28px;
-}
-
-.setting-group:last-child {
-  margin-bottom: 0;
-}
-
-.setting-label {
-  display: block;
-  font-size: 15px;
-  font-weight: 600;
   color: var(--primary-text);
-  margin-bottom: 12px;
-}
-
-/* 单选按钮组 */
-.radio-group {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.radio-item {
-  display: flex;
-  align-items: center;
   cursor: pointer;
-  padding: 10px 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  transition: all 0.2s;
-  background: white;
+  transition: all 0.3s;
 }
-
-.radio-item:hover {
+.chip:hover:not(.active) {
+  background: #f8f9fb;
+  border-color: #d0d5dd;
+}
+.chip.active {
+  background: rgba(255, 68, 61, 0.12);
   border-color: var(--student-primary);
-  background: rgba(255, 68, 61, 0.05);
-}
-
-.radio-item input[type="radio"] {
-  margin: 0 8px 0 0;
-  cursor: pointer;
-  accent-color: var(--student-primary);
-  width: 18px;
-  height: 18px;
-}
-
-.radio-item input[type="radio"]:checked + span {
   color: var(--student-primary);
   font-weight: 600;
 }
 
-.radio-item span {
-  font-size: 14px;
-  color: var(--secondary-text);
-  transition: all 0.2s;
+/* 章节卡片（用于“章节分类”） */
+.chapter-card {
+  background: #ffffff;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
 }
-
-/* 开关组 */
-.switch-group {
+.chapter-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.chapter-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 68, 61, 0.3);
+  background: rgba(255, 68, 61, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.chapter-toggle-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  position: relative;
+  background: var(--student-primary);
+}
+.chapter-toggle-icon::before,
+.chapter-toggle-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 2px;
+  background: #fff;
+  transform: translate(-50%, -50%);
+}
+.chapter-toggle-icon::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+.chapter-toggle-icon.expanded::after {
+  display: none;
+}
+.chapter-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.chapter-order {
+  font-size: 13px;
+  color: var(--student-primary);
+  font-weight: 700;
+}
+.chapter-name {
+  font-size: 16px;
+  color: var(--primary-text);
+  font-weight: 600;
+}
+/* 按你的要求修改间距 */
+.chapter-sections {
+  margin: 12px 0 24px 0;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+.section-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #f0f2f7;
+  background: #fff;
+}
+.section-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.section-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--student-primary);
+}
+.section-title {
+  color: var(--primary-text);
+  font-weight: 600;
+  font-size: 14px;
+}
+.section-meta {
+  font-size: 12px;
+  color: var(--secondary-text);
+}
+.section-count {
+  color: var(--student-primary);
+  font-weight: 700;
+}
+.section-actions {
+  display: flex;
+  gap: 8px;
+}
+.card-footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-meta { color: var(--secondary-text); }
+.footer-count { color: var(--student-primary); font-weight: 700; }
+
+.footer-actions{
+  display: flex;
   gap: 12px;
 }
 
-.switch-item {
+.chapter-slide-enter-active,
+.chapter-slide-leave-active { transition: all 0.2s ease; }
+.chapter-slide-enter-from,
+.chapter-slide-leave-to { opacity: 0; transform: translateY(-6px); }
+
+/* 题型分类：列表样式 */
+.type-list {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+  box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.type-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e4eaf2;
+}
+.type-item:last-child { border-bottom: none; }
+.type-info { display: flex; flex-direction: column; gap: 6px; }
+.type-name { font-size: 15px; color: var(--primary-text); font-weight: 600; }
+.type-meta { font-size: 13px; color: var(--secondary-text); }
+.type-count { color: var(--student-primary); font-weight: 700; }
+.type-actions { display: flex; gap: 12px; }
+
+/* 通用按钮（用于查看/收藏重做） */
+.btn {
+  padding: 6px 16px;
+  border-radius: 22px;
+  font-size: 13px;
   cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-outline {
+  background: #fff;
+  color: var(--student-primary);
+  border: 1px solid var(--student-primary);
+}
+.btn-primary {
+  background: linear-gradient(135deg, #ff443d 0%, #ff6659 100%);
+  color: #fff;
+  border: 1px solid #ff6659;
+  box-shadow: 0 4px 12px rgba(255, 68, 61, 0.2);
+}
+
+/* 需求文档样式（与截图同款风格） */
+.requirements-container {
+  padding: 16px 20px;
+}
+.requirements-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #2c3e50;
+  border-bottom: 3px solid #ff443d;
+  padding-bottom: 8px;
+  margin-bottom: 20px;
+}
+.req-section {
+  margin-bottom: 24px;
+}
+.req-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+.table-card {
+  background: #fff;
+  border: 1px solid #e4eaf2;
+  border-radius: 16px;
+  box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
+  overflow: hidden;
+}
+.table-header {
+  color: #fff;
   padding: 12px 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  transition: all 0.2s;
-  background: white;
+  font-size: 15px;
+  font-weight: 600;
 }
+.header-primary {
+  background: linear-gradient(135deg, #5b4dbb 0%, #7c5cff 100%);
+}
+.header-danger {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%);
+}
+.req-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.req-table th,
+.req-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+  color: #2c3e50;
+  text-align: left;
+  vertical-align: top;
+}
+.req-table thead th {
+  background: #f8fafc;
+  font-weight: 600;
+}
+.req-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.col-key {
+  width: 160px;
+  color: #5a6c7d;
+}
+.col-val {
+  color: #2c3e50;
+}
+.checklist-table .status-ok {
+  display: inline-block;
+  color: #10b981;
+  font-weight: 700;
+}
+@media (max-width: 768px) {
+  .requirements-container {
+    padding: 12px 14px;
+  }
+  .requirements-title {
+    font-size: 20px;
+  }
+  .req-section-title {
+    font-size: 16px;
+  }
+}
+  .style-guide-section { padding: 16px 0 32px; }
+  .sg-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #ff443d;
+  }
+  .sg-section { margin-top: 12px; }
+  .sg-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 12px 0 8px;
+  }
 
-.switch-item:hover {
-  border-color: var(--student-primary);
-  background: rgba(255, 68, 61, 0.05);
-}
+  /* 表格卡片统一样式 */
+  .sg-table-card {
+    background: #fff;
+    border: 1px solid #e4eaf2;
+    border-radius: 12px;
+    box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
+    overflow: hidden;
+  }
+  .sg-table-header {
+    color: #fff;
+    font-weight: 600;
+    padding: 10px 14px;
+  }
+  .sg-table-header.header-gradient {
+    background: linear-gradient(135deg, #6f66ff 0%, #8a4bff 100%);
+  }
 
-.switch-item input[type="checkbox"] {
-  display: none;
-}
-
-.switch-box {
-  position: relative;
-  width: 44px;
-  height: 24px;
-  background: #ccc;
-  border-radius: 12px;
-  margin-right: 12px;
-  transition: background 0.3s;
-}
-
-.switch-box::after {
-  content: '';
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: white;
-  top: 3px;
-  left: 3px;
-  transition: transform 0.3s;
-}
-
-.switch-item input[type="checkbox"]:checked + .switch-box {
-  background: var(--student-primary);
-}
-
-.switch-item input[type="checkbox"]:checked + .switch-box::after {
-  transform: translateX(20px);
-}
-
-.switch-text {
-  font-size: 14px;
-  color: var(--primary-text);
-  font-weight: 500;
-}
+  .sg-table { width: 100%; border-collapse: collapse; }
+  .sg-table th {
+    text-align: left;
+    font-weight: 600;
+    color: #5a6c7d;
+    background: #f9fafb;
+  }
+  .sg-table th,
+  .sg-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #eef2f7;
+    font-size: 14px;
+  }
+  .sg-table tbody tr:hover td { background: #fafafa; }
+  .sg-table tbody tr:last-child td { border-bottom: none; }
 </style>

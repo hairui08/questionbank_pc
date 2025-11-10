@@ -6,7 +6,6 @@
     @close="handleClose"
   >
     <div class="confirm-content">
-      <div class="warning-icon">⚠️</div>
       <p class="warning-text">{{ message }}</p>
       <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
     </div>
@@ -75,12 +74,7 @@ const handleClose = () => {
 <style scoped>
 .confirm-content {
   text-align: center;
-  padding: 20px 0;
-}
-
-.warning-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
+  padding: 12px 0;
 }
 
 .warning-text {

@@ -64,7 +64,10 @@
                 <ul>
                   <li><strong>章节名称唯一性</strong>: 同一科目下章节名称不能重复,不同科目可重复</li>
                   <li><strong>小节名称唯一性</strong>: 同一章节下小节名称不能重复,不同章节可重复</li>
-                  <li><strong>删除保护</strong>: 章节下有小节时不可删除,必须先删除所有小节</li>
+                  <li><strong>删除保护-小节检查</strong>: 章节下有小节时不可删除,必须先删除所有小节</li>
+                  <li><strong>删除保护-试题引用</strong>: 章节被试题引用时不可删除,系统提示"该章节下有X道试题,无法删除。请先删除或转移相关试题"</li>
+                  <li><strong>删除保护-阶段引用</strong>: 章节被学习阶段的资源配置引用时不可删除,系统提示"该章节被X个学习阶段引用,无法删除。请先调整相关学习阶段配置"</li>
+                  <li><strong>禁用影响提示</strong>: 禁用章节时系统提示影响范围:"该章节下有X道试题、被Y个学习阶段引用,禁用后将影响相关功能。是否继续?"</li>
                   <li><strong>状态独立性</strong>: 章节和小节的状态独立管理,禁用章节不影响小节的独立编辑</li>
                   <li><strong>排序规则</strong>: 排序字段必须为正整数(1-999),默认自动递增,用户可手动调整</li>
                   <li><strong>展开交互</strong>: 点击章节行展开/收起小节列表,支持多个章节同时展开</li>
@@ -112,14 +115,22 @@
                   </tr>
                   <tr>
                     <td>删除保护</td>
-                    <td>删除章节前检查是否有小节</td>
-                    <td>若存在小节，提示"该章节下存在N个小节，请先删除小节"，拒绝删除；无小节时二次确认后删除</td>
+                    <td>删除章节前进行三重检查：小节、试题引用、学习阶段引用</td>
+                    <td>
+                      检查1：若有小节，提示"该章节下存在N个小节，请先删除小节"<br/>
+                      检查2：若被试题引用，提示"该章节下有X道试题，无法删除。请先删除或转移相关试题"<br/>
+                      检查3：若被学习阶段引用，提示"该章节被X个学习阶段引用，无法删除。请先调整相关学习阶段配置"<br/>
+                      全部检查通过后，二次确认后删除
+                    </td>
                     <td>P0</td>
                   </tr>
                   <tr>
                     <td>状态管理</td>
-                    <td>章节和小节均支持启用/禁用</td>
-                    <td>禁用的章节不影响小节的独立编辑，状态变更立即生效</td>
+                    <td>章节和小节均支持启用/禁用，禁用时显示影响范围提示</td>
+                    <td>
+                      禁用章节时提示："该章节下有X道试题、被Y个学习阶段引用，禁用后将影响相关功能。是否继续？"<br/>
+                      禁用的章节不影响小节的独立编辑，状态变更立即生效
+                    </td>
                     <td>P0</td>
                   </tr>
                   <tr>
@@ -352,6 +363,24 @@
                       <td>筛选项变更</td>
                       <td>章节列表应立即更新,显示所有状态的章节(启用和禁用)</td>
                     </tr>
+                    <tr>
+                      <td>AC-21</td>
+                      <td>章节"第二章 预算管理"下有15道试题</td>
+                      <td>用户尝试删除该章节</td>
+                      <td>系统提示"该章节下有15道试题，无法删除。请先删除或转移相关试题",拒绝删除</td>
+                    </tr>
+                    <tr>
+                      <td>AC-22</td>
+                      <td>章节"第一章 总论"被3个学习阶段的资源配置引用</td>
+                      <td>用户尝试删除该章节</td>
+                      <td>系统提示"该章节被3个学习阶段引用，无法删除。请先调整相关学习阶段配置",拒绝删除</td>
+                    </tr>
+                    <tr>
+                      <td>AC-23</td>
+                      <td>章节"第二章 预算管理"下有12道试题、被2个学习阶段引用，状态为启用</td>
+                      <td>用户点击章节行【启用/禁用】按钮</td>
+                      <td>系统提示"该章节下有12道试题、被2个学习阶段引用，禁用后将影响相关功能。是否继续？",用户确认后状态切换为"禁用"</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -415,6 +444,16 @@
       @confirm="handleDeleteConfirm"
     />
 
+    <!-- 启用/禁用确认弹窗 -->
+    <ToggleStatusConfirmModal
+      :visible="isToggleStatusModalVisible"
+      :action-type="toggleActionType"
+      :message="toggleMessage"
+      :entity-name="toggleEntityType === 'chapter' ? '章节' : '小节'"
+      @update:visible="isToggleStatusModalVisible = $event"
+      @confirm="handleToggleStatusConfirm"
+    />
+
     <!-- Toast提示 -->
     <Toast
       :visible="toastVisible"
@@ -439,6 +478,7 @@ import EditChapterModal from './components/EditChapterModal.vue'
 import AddSectionModal from './components/AddSectionModal.vue'
 import EditSectionModal from './components/EditSectionModal.vue'
 import DeleteConfirmModal from './components/DeleteConfirmModal.vue'
+import ToggleStatusConfirmModal from '@/components/ToggleStatusConfirmModal.vue'
 import type {
   Chapter,
   Section,
@@ -478,6 +518,14 @@ const deleteModalMessage = ref('')
 const deleteModalError = ref('')
 const deletingType = ref<'chapter' | 'section'>('chapter')
 const deletingTarget = ref<Chapter | Section | null>(null)
+
+// 启用/禁用确认弹窗相关状态
+const isToggleStatusModalVisible = ref(false)
+const toggleActionType = ref<'enable' | 'disable'>('enable')
+const toggleMessage = ref('')
+const toggleEntityType = ref<'chapter' | 'section'>('chapter')
+const pendingToggleChapter = ref<Chapter | null>(null)
+const pendingToggleSection = ref<Section | null>(null)
 
 /**
  * 初始化：选中第一个科目
@@ -573,16 +621,23 @@ const openDeleteChapterModal = (chapter: Chapter) => {
 }
 
 /**
- * 切换章节状态
+ * 切换章节状态 - 显示确认弹窗
  */
 const handleToggleChapterStatus = (chapter: Chapter) => {
-  try {
-    chapterStore.toggleChapterStatus(chapter.id)
-    const newStatus = chapter.status === 'active' ? '禁用' : '启用'
-    showToast(`章节已${newStatus}`, { type: 'success' })
-  } catch (error) {
-    showToast((error as Error).message, { type: 'error' })
+  toggleEntityType.value = 'chapter'
+  pendingToggleChapter.value = chapter
+
+  if (chapter.status === 'active') {
+    // 禁用章节
+    toggleActionType.value = 'disable'
+    toggleMessage.value = `确定要禁用章节「${chapter.name}」吗？`
+  } else {
+    // 启用章节
+    toggleActionType.value = 'enable'
+    toggleMessage.value = `确定要启用章节「${chapter.name}」吗？`
   }
+
+  isToggleStatusModalVisible.value = true
 }
 
 /**
@@ -638,16 +693,23 @@ const openDeleteSectionModal = (section: Section) => {
 }
 
 /**
- * 切换小节状态
+ * 切换小节状态 - 显示确认弹窗
  */
 const handleToggleSectionStatus = (section: Section) => {
-  try {
-    chapterStore.toggleSectionStatus(section.id)
-    const newStatus = section.status === 'active' ? '禁用' : '启用'
-    showToast(`小节已${newStatus}`, { type: 'success' })
-  } catch (error) {
-    showToast((error as Error).message, { type: 'error' })
+  toggleEntityType.value = 'section'
+  pendingToggleSection.value = section
+
+  if (section.status === 'active') {
+    // 禁用小节
+    toggleActionType.value = 'disable'
+    toggleMessage.value = `确定要禁用小节「${section.name}」吗？`
+  } else {
+    // 启用小节
+    toggleActionType.value = 'enable'
+    toggleMessage.value = `确定要启用小节「${section.name}」吗？`
   }
+
+  isToggleStatusModalVisible.value = true
 }
 
 /**
@@ -669,6 +731,27 @@ const handleDeleteConfirm = () => {
   } catch (error) {
     // 如果删除失败（比如章节下有小节），显示错误信息但保持弹窗打开
     deleteModalError.value = (error as Error).message
+  }
+}
+
+/**
+ * 确认切换启用/禁用状态
+ */
+const handleToggleStatusConfirm = () => {
+  try {
+    if (toggleEntityType.value === 'chapter' && pendingToggleChapter.value) {
+      chapterStore.toggleChapterStatus(pendingToggleChapter.value.id)
+      const newStatus = pendingToggleChapter.value.status === 'active' ? '禁用' : '启用'
+      showToast(`章节已${newStatus}`, { type: 'success' })
+      isToggleStatusModalVisible.value = false
+    } else if (toggleEntityType.value === 'section' && pendingToggleSection.value) {
+      chapterStore.toggleSectionStatus(pendingToggleSection.value.id)
+      const newStatus = pendingToggleSection.value.status === 'active' ? '禁用' : '启用'
+      showToast(`小节已${newStatus}`, { type: 'success' })
+      isToggleStatusModalVisible.value = false
+    }
+  } catch (error) {
+    showToast((error as Error).message, { type: 'error' })
   }
 }
 </script>

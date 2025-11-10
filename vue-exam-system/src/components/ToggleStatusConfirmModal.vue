@@ -2,23 +2,25 @@
   <BaseModal
     :visible="isVisible"
     :title="title"
+    width="360px"
     @update:visible="isVisible = $event"
     @close="handleClose"
   >
     <div class="confirm-content">
       <p class="warning-text">{{ message }}</p>
-      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
     </div>
 
     <template #footer>
       <button class="btn secondary" @click="handleClose">取消</button>
-      <button class="btn danger" @click="handleConfirm">确认删除</button>
+      <button class="btn" :class="confirmButtonClass" @click="handleConfirm">
+        {{ confirmButtonText }}
+      </button>
     </template>
   </BaseModal>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import BaseModal from '@/components/Modal/BaseModal.vue'
 
 // Props
@@ -26,12 +28,13 @@ interface Props {
   visible: boolean
   title?: string
   message: string
-  errorMessage?: string
+  actionType: 'enable' | 'disable'
+  entityName?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  title: '确认删除',
-  errorMessage: ''
+  title: '',
+  entityName: ''
 })
 
 // Emits
@@ -56,11 +59,33 @@ watch(isVisible, (newVal) => {
 })
 
 /**
- * 确认删除
+ * 根据操作类型计算弹窗标题
+ */
+const title = computed(() => {
+  if (props.title) return props.title
+  return props.actionType === 'enable' ? '确认启用' : '确认禁用'
+})
+
+/**
+ * 确认按钮文字
+ */
+const confirmButtonText = computed(() => {
+  return props.actionType === 'enable' ? '启用' : '禁用'
+})
+
+/**
+ * 确认按钮样式类
+ */
+const confirmButtonClass = computed(() => {
+  return props.actionType === 'enable' ? 'success' : 'warning'
+})
+
+/**
+ * 确认操作
  */
 const handleConfirm = () => {
   emit('confirm')
-  // 不自动关闭，让父组件在删除成功后关闭
+  // 不自动关闭，让父组件在操作成功后关闭
 }
 
 /**
@@ -82,16 +107,7 @@ const handleClose = () => {
   color: var(--primary-text);
   margin: 0 0 12px;
   line-height: 1.6;
-}
-
-.error-message {
-  font-size: 14px;
-  color: #e74c3c;
-  margin: 12px 0 0;
-  padding: 12px;
-  background-color: #fff3f0;
-  border: 1px solid #e74c3c;
-  border-radius: 6px;
+  white-space: pre-line;
 }
 
 .btn {
@@ -114,13 +130,23 @@ const handleClose = () => {
   background-color: rgba(0, 102, 204, 0.08);
 }
 
-.btn.danger {
-  background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);
+.btn.success {
+  background: linear-gradient(180deg, #27ae60 0%, #229954 100%);
   color: #ffffff;
-  border-color: #c0392b;
+  border-color: #229954;
 }
 
-.btn.danger:hover {
-  background: linear-gradient(180deg, #d62c1a 0%, #a93226 100%);
+.btn.success:hover {
+  background: linear-gradient(180deg, #1e8e4e 0%, #1a7a3f 100%);
+}
+
+.btn.warning {
+  background: linear-gradient(180deg, #f39c12 0%, #e67e22 100%);
+  color: #ffffff;
+  border-color: #e67e22;
+}
+
+.btn.warning:hover {
+  background: linear-gradient(180deg, #d68910 0%, #ca6f1e 100%);
 }
 </style>

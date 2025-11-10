@@ -513,6 +513,16 @@
       :project-name="selectedProjectName"
       @submit="handleAddSubject"
     />
+
+    <!-- 启用/禁用确认弹窗 -->
+    <ToggleStatusConfirmModal
+      :visible="isToggleStatusModalVisible"
+      :action-type="toggleActionType"
+      :message="toggleMessage"
+      :entity-name="toggleEntityType === 'project' ? '项目' : '科目'"
+      @update:visible="isToggleStatusModalVisible = $event"
+      @confirm="handleToggleStatusConfirm"
+    />
   </AppLayout>
 </template>
 
@@ -522,6 +532,7 @@ import AppLayout from '@/components/Layout/AppLayout.vue'
 import TabNavigation from '@/components/Tab/TabNavigation.vue'
 import AddProjectModal from './components/AddProjectModal.vue'
 import AddSubjectModal from './components/AddSubjectModal.vue'
+import ToggleStatusConfirmModal from '@/components/ToggleStatusConfirmModal.vue'
 import { useProjectStore } from '@/stores/project'
 import { useToast } from '@/composables/useToast'
 import type { Project, Subject, ProjectFormData, SubjectFormData } from './types'
@@ -549,6 +560,14 @@ const addProjectModalVisible = ref(false)
 const addSubjectModalVisible = ref(false)
 const selectedProjectId = ref('')
 const selectedProjectName = ref('')
+
+// 启用/禁用确认弹窗相关状态
+const isToggleStatusModalVisible = ref(false)
+const toggleActionType = ref<'enable' | 'disable'>('enable')
+const toggleMessage = ref('')
+const toggleEntityType = ref<'project' | 'subject'>('project')
+const pendingToggleProject = ref<Project | null>(null)
+const pendingToggleSubject = ref<Subject | null>(null)
 
 // 筛选后的项目列表
 const filteredProjects = computed(() => {
@@ -612,25 +631,64 @@ const handleAddSubject = (data: SubjectFormData) => {
   expandedProjects.value.add(data.projectId)
 }
 
-// 切换项目状态
+// 切换项目状态 - 显示确认弹窗
 const handleToggleProjectStatus = (project: Project) => {
-  const result = projectStore.toggleProjectStatus(project.id)
-  if (result.success) {
-    const action = project.status === 'active' ? '禁用' : '启用'
-    showToast(`项目已${action}`)
+  toggleEntityType.value = 'project'
+  pendingToggleProject.value = project
+
+  if (project.status === 'active') {
+    // 禁用项目
+    toggleActionType.value = 'disable'
+    toggleMessage.value = `确定要禁用项目「${project.name}」吗？\n\n禁用后将无法新增科目。`
   } else {
-    showToast(result.message || '操作失败', { type: 'error' })
+    // 启用项目
+    toggleActionType.value = 'enable'
+    toggleMessage.value = `确定要启用项目「${project.name}」吗？`
   }
+
+  isToggleStatusModalVisible.value = true
 }
 
-// 切换科目状态
+// 切换科目状态 - 显示确认弹窗
 const handleToggleSubjectStatus = (subject: Subject) => {
-  const result = projectStore.toggleSubjectStatus(subject.id)
-  if (result.success) {
-    const action = subject.status === 'active' ? '禁用' : '启用'
-    showToast(`科目已${action}`)
+  toggleEntityType.value = 'subject'
+  pendingToggleSubject.value = subject
+
+  if (subject.status === 'active') {
+    // 禁用科目
+    toggleActionType.value = 'disable'
+    toggleMessage.value = `确定要禁用科目「${subject.name}」吗？`
   } else {
-    showToast(result.message || '操作失败', { type: 'error' })
+    // 启用科目
+    toggleActionType.value = 'enable'
+    toggleMessage.value = `确定要启用科目「${subject.name}」吗？`
+  }
+
+  isToggleStatusModalVisible.value = true
+}
+
+// 确认切换启用/禁用状态
+const handleToggleStatusConfirm = () => {
+  let result
+
+  if (toggleEntityType.value === 'project' && pendingToggleProject.value) {
+    result = projectStore.toggleProjectStatus(pendingToggleProject.value.id)
+    if (result.success) {
+      const action = pendingToggleProject.value.status === 'active' ? '禁用' : '启用'
+      showToast(`项目已${action}`)
+      isToggleStatusModalVisible.value = false
+    } else {
+      showToast(result.message || '操作失败', { type: 'error' })
+    }
+  } else if (toggleEntityType.value === 'subject' && pendingToggleSubject.value) {
+    result = projectStore.toggleSubjectStatus(pendingToggleSubject.value.id)
+    if (result.success) {
+      const action = pendingToggleSubject.value.status === 'active' ? '禁用' : '启用'
+      showToast(`科目已${action}`)
+      isToggleStatusModalVisible.value = false
+    } else {
+      showToast(result.message || '操作失败', { type: 'error' })
+    }
   }
 }
 </script>

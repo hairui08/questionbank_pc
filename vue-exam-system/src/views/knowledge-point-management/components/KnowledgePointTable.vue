@@ -5,10 +5,24 @@
         <h3>{{ projectName }} - {{ subjectName }}</h3>
         <p>共 {{ knowledgePoints.length }} 个知识点</p>
       </div>
-      <button class="btn-add" @click="$emit('add-knowledge-point')">
-        <span class="icon">+</span>
-        添加知识点
-      </button>
+      <div class="header-actions">
+        <div class="filter-group">
+          <label for="status-filter">启用状态：</label>
+          <select
+            id="status-filter"
+            :value="statusFilter"
+            @change="$emit('update:status-filter', ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="active">启用</option>
+            <option value="disabled">禁用</option>
+            <option value="all">全部</option>
+          </select>
+        </div>
+        <button class="btn-add" @click="$emit('add-knowledge-point')">
+          <span class="icon">+</span>
+          添加知识点
+        </button>
+      </div>
     </div>
 
     <div class="table-wrapper">
@@ -16,8 +30,9 @@
         <thead>
           <tr>
             <th width="60px">序号</th>
-            <th width="22%">知识点名称</th>
-            <th width="22%">关联章节</th>
+            <th width="18%">知识点名称</th>
+            <th width="14%">章</th>
+            <th width="14%">节</th>
             <th width="10%">试题数量</th>
             <th width="15%">创建时间</th>
             <th width="10%">创建人</th>
@@ -38,14 +53,50 @@
                 </span>
               </div>
             </td>
+            <!-- 章列 -->
             <td>
-              <div class="chapter-list">
-                <span v-if="getChapterNames(kp.chapterIds).length === 0" class="empty-text">
+              <div
+                class="compact-list"
+                :title="getChapterNamesText(kp.chapterIds)"
+              >
+                <div
+                  v-if="getChapterNames(kp.chapterIds).length === 0"
+                  class="empty-text"
+                >
                   未关联章节
-                </span>
-                <span v-else class="chapter-names">
-                  {{ getChapterNames(kp.chapterIds).join('、') }}
-                </span>
+                </div>
+                <template v-else>
+                  <div class="first-item">{{ getChapterNames(kp.chapterIds)[0] }}</div>
+                  <div
+                    v-if="getChapterNames(kp.chapterIds).length > 1"
+                    class="more-indicator"
+                  >
+                    ...
+                  </div>
+                </template>
+              </div>
+            </td>
+            <!-- 节列 -->
+            <td>
+              <div
+                class="compact-list"
+                :title="getSectionNamesText(kp.chapterIds)"
+              >
+                <div
+                  v-if="getSectionNames(kp.chapterIds).length === 0"
+                  class="empty-text"
+                >
+                  无小节
+                </div>
+                <template v-else>
+                  <div class="first-item">{{ getSectionNames(kp.chapterIds)[0] }}</div>
+                  <div
+                    v-if="getSectionNames(kp.chapterIds).length > 1"
+                    class="more-indicator"
+                  >
+                    ...
+                  </div>
+                </template>
               </div>
             </td>
             <td>
@@ -77,6 +128,13 @@
                 >
                   删除
                 </button>
+                <button
+                  class="btn-action btn-toggle"
+                  :class="{ 'btn-toggle-enable': kp.status === 'disabled', 'btn-toggle-disable': kp.status === 'active' }"
+                  @click="$emit('toggle-status', kp)"
+                >
+                  {{ kp.status === 'active' ? '禁用' : '启用' }}
+                </button>
               </div>
             </td>
           </tr>
@@ -101,6 +159,7 @@ interface Props {
   subjectName: string
   projectName: string
   knowledgePoints: KnowledgePoint[]
+  statusFilter: string
 }
 
 const props = defineProps<Props>()
@@ -109,16 +168,41 @@ const emit = defineEmits<{
   'add-knowledge-point': []
   'edit-knowledge-point': [kp: KnowledgePoint]
   'delete-knowledge-point': [kp: KnowledgePoint]
+  'toggle-status': [kp: KnowledgePoint]
   'show-questions': [knowledgePointId: string]
+  'update:status-filter': [value: string]
 }>()
 
 const knowledgePointStore = useKnowledgePointStore()
 
 /**
- * 获取章节名称列表
+ * 获取章节名称数组
  */
 const getChapterNames = (chapterIds: string[]): string[] => {
-  return knowledgePointStore.getChapterNamesByIds(chapterIds)
+  return knowledgePointStore.getChapterNamesOnly(chapterIds)
+}
+
+/**
+ * 获取小节名称数组
+ */
+const getSectionNames = (chapterIds: string[]): string[] => {
+  return knowledgePointStore.getAllSectionNames(chapterIds)
+}
+
+/**
+ * 获取章节名称文本（用换行符分隔，用于悬浮提示）
+ */
+const getChapterNamesText = (chapterIds: string[]): string => {
+  const names = knowledgePointStore.getChapterNamesOnly(chapterIds)
+  return names.length > 0 ? names.join('\n') : '未关联章节'
+}
+
+/**
+ * 获取小节名称文本（用换行符分隔，用于悬浮提示）
+ */
+const getSectionNamesText = (chapterIds: string[]): string => {
+  const names = knowledgePointStore.getAllSectionNames(chapterIds)
+  return names.length > 0 ? names.join('\n') : '无小节'
 }
 
 /**
@@ -197,6 +281,45 @@ const getCreatorName = (creatorId: string): string => {
   margin: 0;
   font-size: 14px;
   color: var(--secondary-text);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-group label {
+  font-size: 14px;
+  color: var(--secondary-text);
+  font-weight: 500;
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--primary-text);
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-group select:hover {
+  border-color: var(--accent);
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
 }
 
 .btn-add {
@@ -289,6 +412,18 @@ td {
   font-size: 12px;
   border-radius: 12px;
   font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .status-badge.disabled {
@@ -296,17 +431,40 @@ td {
   color: #c33;
 }
 
-.chapter-list {
-  color: var(--secondary-text);
+/* 紧凑列表容器 */
+.compact-list {
+  cursor: help;
+  line-height: 1.5;
 }
 
-.empty-text {
+.compact-list:hover {
+  color: var(--accent);
+}
+
+/* 第一项 */
+.first-item {
+  color: var(--primary-text);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.2s;
+}
+
+/* 更多指示器（省略号） */
+.more-indicator {
+  color: var(--secondary-text);
+  font-size: 14px;
+  margin-top: 2px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+/* 空状态文本 */
+.compact-list .empty-text {
   color: #999;
   font-style: italic;
-}
-
-.chapter-names {
-  color: var(--primary-text);
+  font-size: 13px;
 }
 
 .question-count {
@@ -367,6 +525,32 @@ td {
 
 .btn-delete:hover {
   background: #c33;
+  color: white;
+}
+
+.btn-toggle {
+  min-width: 60px;
+}
+
+.btn-toggle-disable {
+  background: #f5f7fa;
+  color: #5a6c7d;
+  border: 1px solid #dfe3eb;
+}
+
+.btn-toggle-disable:hover {
+  background: #e4eaf2;
+  color: #2c3e50;
+}
+
+.btn-toggle-enable {
+  background: #e8f4fd;
+  color: #0066cc;
+  border: 1px solid #0066cc;
+}
+
+.btn-toggle-enable:hover {
+  background: #0066cc;
   color: white;
 }
 

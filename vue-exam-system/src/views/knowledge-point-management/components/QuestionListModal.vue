@@ -78,6 +78,14 @@
                 <span class="meta-label">年份:</span>
                 {{ question.year }}
               </span>
+              <span class="meta-item">
+                <span class="meta-label">创建人:</span>
+                {{ getCreatorName(question.creatorId) }}
+              </span>
+              <span class="meta-item">
+                <span class="meta-label">创建时间:</span>
+                {{ formatDateTime(question.createTime) }}
+              </span>
             </div>
           </div>
         </div>
@@ -85,6 +93,55 @@
         <div v-else class="empty-state">
           <div class="empty-icon">📝</div>
           <p class="empty-text">暂无关联试题</p>
+        </div>
+      </div>
+
+      <!-- 分页器 -->
+      <div v-if="paginatedData.total > 0" class="pagination">
+        <div class="pagination-info">
+          共 {{ paginatedData.total }} 条记录，第 {{ currentPage }} / {{ paginatedData.totalPages }} 页
+        </div>
+        <div class="pagination-controls">
+          <button
+            class="page-btn"
+            :disabled="currentPage === 1"
+            @click="handlePageChange(currentPage - 1)"
+          >
+            上一页
+          </button>
+          <div class="page-numbers">
+            <template v-for="page in visiblePages" :key="page">
+              <button
+                v-if="page === -1"
+                class="page-number ellipsis"
+                disabled
+              >
+                ...
+              </button>
+              <button
+                v-else
+                class="page-number"
+                :class="{ active: page === currentPage }"
+                @click="handlePageChange(page)"
+              >
+                {{ page }}
+              </button>
+            </template>
+          </div>
+          <button
+            class="page-btn"
+            :disabled="currentPage === paginatedData.totalPages"
+            @click="handlePageChange(currentPage + 1)"
+          >
+            下一页
+          </button>
+        </div>
+        <div class="pagination-size">
+          <select :value="pageSize" @change="handlePageSizeChange(Number(($event.target as HTMLSelectElement).value))">
+            <option :value="10">10 条/页</option>
+            <option :value="20">20 条/页</option>
+            <option :value="50">50 条/页</option>
+          </select>
         </div>
       </div>
     </div>
@@ -124,10 +181,39 @@ const { showToast } = useToast()
 // 本地visible状态
 const isVisible = ref(props.visible)
 
-// 获取关联的试题列表
-const questions = computed<Question[]>(() => {
-  if (!props.knowledgePointId) return []
-  return knowledgePointStore.getQuestionsByKnowledgePoint(props.knowledgePointId)
+// 分页状态
+const currentPage = ref(1)
+const pageSize = ref(10)
+
+// 获取关联的试题列表（分页）
+const paginatedData = computed(() => {
+  if (!props.knowledgePointId) return { list: [], total: 0, totalPages: 0, currentPage: 1, pageSize: 10 }
+  return knowledgePointStore.getPaginatedQuestionsByKnowledgePoint(
+    props.knowledgePointId,
+    currentPage.value,
+    pageSize.value
+  )
+})
+
+const questions = computed<Question[]>(() => paginatedData.value.list)
+
+// 可见页码列表（最多显示7个页码）
+const visiblePages = computed(() => {
+  const total = paginatedData.value.totalPages
+  const current = currentPage.value
+
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+
+  // 智能省略号逻辑
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, -1, total]
+  } else if (current >= total - 3) {
+    return [1, -1, total - 4, total - 3, total - 2, total - 1, total]
+  } else {
+    return [1, -1, current - 1, current, current + 1, -1, total]
+  }
 })
 
 // 监听visible变化
@@ -226,10 +312,53 @@ const formatAnswer = (answer: string | string[]): string => {
 }
 
 /**
+ * 获取创建人名称
+ */
+const getCreatorName = (creatorId: string): string => {
+  const creatorMap: Record<string, string> = {
+    'admin': '管理员',
+    'editor': '编辑员',
+    'user-001': '当前用户'
+  }
+  return creatorMap[creatorId] || creatorId
+}
+
+/**
+ * 格式化日期时间
+ */
+const formatDateTime = (dateTime: string): string => {
+  const date = new Date(dateTime)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+/**
+ * 切换页码
+ */
+const handlePageChange = (page: number) => {
+  if (page < 1 || page > paginatedData.value.totalPages) return
+  currentPage.value = page
+}
+
+/**
+ * 切换每页条数
+ */
+const handlePageSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1 // 重置到第一页
+}
+
+/**
  * 关闭弹窗
  */
 const handleClose = () => {
   isVisible.value = false
+  currentPage.value = 1 // 重置分页
 }
 </script>
 
@@ -425,8 +554,8 @@ const handleClose = () => {
 /* 卡片底部元数据 */
 .card-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 24px;
   padding: 14px 20px;
   background: #f5f8fc;
   font-size: 13px;
@@ -436,10 +565,12 @@ const handleClose = () => {
 .meta-item {
   display: flex;
   gap: 6px;
+  align-items: center;
 }
 
 .meta-label {
   font-weight: 600;
+  color: var(--primary-text);
 }
 
 /* 徽章 */
@@ -528,5 +659,102 @@ const handleClose = () => {
 
 .btn.primary:hover {
   background: linear-gradient(180deg, #4b6ee6 0%, #264acc 100%);
+}
+
+/* 分页器样式 */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  border-top: 1px solid var(--panel-border);
+  margin-top: 24px;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: var(--secondary-text);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--panel-border);
+  background: white;
+  color: var(--primary-text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 4px;
+}
+
+.page-number {
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid var(--panel-border);
+  background: white;
+  color: var(--primary-text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.page-number:hover:not(.ellipsis):not(.active) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.page-number.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.page-number.ellipsis {
+  border: none;
+  cursor: default;
+  color: var(--secondary-text);
+}
+
+.pagination-size select {
+  padding: 8px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  background: white;
+  color: var(--primary-text);
+  transition: all 0.2s;
+}
+
+.pagination-size select:hover {
+  border-color: var(--accent);
+}
+
+.pagination-size select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
 }
 </style>

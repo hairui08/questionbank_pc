@@ -103,22 +103,136 @@
         </header>
 
         <div class="resource-list">
-          <article v-for="item in resourceItems" :key="item.id" class="resource-item">
-            <div class="resource-main">
-              <div class="resource-title">{{ item.title }}</div>
-              <div class="resource-subtitle">{{ item.subtitle }}</div>
-            </div>
-            <div class="resource-actions">
-              <button class="text-link" v-if="item.canReview">查看解析</button>
-              <button class="text-link" v-if="item.canDownload">下载</button>
-              <button class="primary-link" @click="handleStartExam(item)">{{ item.action }}</button>
-            </div>
-          </article>
+          <!-- 树形结构：章节练习 -->
+          <template v-if="activePracticeKey === 'chapter'">
+            <div class="chapter-tree">
+              <article
+                v-for="chapter in chapterTree"
+                :key="chapter.id"
+                class="chapter-card"
+              >
+                <div class="chapter-row">
+                  <div class="chapter-main">
+                    <button
+                      class="chapter-toggle"
+                      :aria-label="isChapterExpanded(chapter.id) ? '收起章节' : '展开章节'"
+                      @click="toggleChapter(chapter.id)"
+                    >
+                      <span
+                        class="chapter-toggle-icon"
+                        :class="{ expanded: isChapterExpanded(chapter.id) }"
+                      />
+                    </button>
+                    <div class="chapter-title">
+                      <span class="chapter-order">{{ chapter.order }}</span>
+                      <span class="chapter-name">{{ chapter.title }}</span>
+                    </div>
+                  </div>
 
-              <p v-if="!resourceItems.length" class="empty-state">
-                当前入口暂无试卷或练习，稍后再来看看吧～
-              </p>
+                  <!-- 右侧：统计 + 单按钮（根据做题进度） -->
+                  <div class="chapter-extra">
+                    <div class="chapter-meta">
+                      正确率：<strong>{{ chapter.accuracy }}%</strong>
+                      <span class="meta-split">|</span>
+                      已做/总题：<strong>{{ chapter.done }}/{{ chapter.total }}</strong>
+                    </div>
+                    <div class="chapter-actions">
+                      <button
+                        v-if="chapter.done === 0"
+                        class="btn btn-primary"
+                        @click="startExam()"
+                      >做题</button>
+                      <button
+                        v-else-if="chapter.done < chapter.total"
+                        class="btn btn-secondary"
+                        @click="redoByChapter(chapter.title)"
+                      >继续</button>
+                      <button
+                        v-else
+                        class="btn btn-danger"
+                        @click="redoByChapter(chapter.title)"
+                      >重做</button>
+                    </div>
+                  </div>
+                </div>
+
+                <transition name="chapter-slide">
+                  <div v-if="isChapterExpanded(chapter.id)" class="chapter-sections">
+                    <div
+                      v-for="sec in chapter.sections"
+                      :key="sec.id"
+                      class="section-row"
+                    >
+                      <div class="section-info" @click="selectChapterNode({ title: sec.title })">
+                        <span class="section-dot"></span>
+                        <span class="section-name">{{ sec.title }}</span>
+                      </div>
+
+                      <div class="section-meta">
+                        正确率：<strong>{{ sec.accuracy || 0 }}%</strong>
+                        <span class="meta-split">|</span>
+                        已做/总题：<strong>{{ (sec.done || 0) }}/{{ (sec.total || 0) }}</strong>
+                      </div>
+
+                      <div class="section-actions">
+                        <button
+                          v-if="(sec.done || 0) === 0"
+                          class="btn btn-primary"
+                          @click="startExam()"
+                        >做题</button>
+                        <button
+                          v-else-if="(sec.done || 0) < (sec.total || 0)"
+                          class="btn btn-secondary"
+                          @click="redoByChapter(sec.title)"
+                        >继续</button>
+                        <button
+                          v-else
+                          class="btn btn-danger"
+                          @click="redoByChapter(sec.title)"
+                        >重做</button>
+                      </div>
+                    </div>
+                  </div>
+                </transition>
+              </article>
             </div>
+
+            <p v-if="!chapterTree.length" class="empty-state">
+              当前入口暂无试卷或练习，稍后再来看看吧～
+            </p>
+          </template>
+
+          <template v-else>
+            <!-- 非章节练习：使用分页后的数据 -->
+            <article
+              v-for="item in pagedResourceItems"
+              :key="item.id"
+              class="resource-item"
+            >
+              <div class="resource-main">
+                <div class="resource-title">{{ item.title }}</div>
+                <div class="resource-subtitle">{{ item.subtitle }}</div>
+              </div>
+              <div class="resource-actions">
+                <button class="primary-link" @click="handleStartExam(item)">{{ item.action }}</button>
+              </div>
+            </article>
+
+            <!-- 替换为通用分页组件 -->
+            <Pagination
+              v-if="showPagination && totalItems > 0"
+              :current-page="currentPage"
+              :total="totalItems"
+              :page-size="pageSize"
+              @page-change="handlePageChange"
+              @size-change="handlePageSizeChange"
+            />
+
+            <p v-if="!resourceItems.length" class="empty-state">
+              当前入口暂无试卷或练习，稍后再来看看吧～
+            </p>
+          </template>
+        </div>
           </section>
           </div>
         </template>
@@ -814,6 +928,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import TabNavigation from '@/components/Tab/TabNavigation.vue'
+import Pagination from '@/components/Pagination/Pagination.vue'
 
 type PracticeKey =
   | 'chapter'
@@ -1135,6 +1250,45 @@ const resourceItems = computed<ResourceItem[]>(() => {
   const config = currentSurface.value.resourceConfig[activePracticeKey.value]
   return config?.items ?? []
 })
+const totalItems = computed(() => resourceItems.value.length || 0)
+
+// 分页状态（仅用于非章节练习）
+const pageSize = ref(10)
+const currentPage = ref(1)
+
+// 哪些模式展示分页：历年真题、考前冲刺、入学测试
+const showPagination = computed(() =>
+  ['realExam', 'sprint', 'entrance'].includes(activePracticeKey.value)
+)
+
+// 总页数与分页数据
+const pageCount = computed(() => {
+  if (!showPagination.value) return 1
+  const total = resourceItems.value.length || 0
+  return Math.max(1, Math.ceil(total / pageSize.value))
+})
+
+const pagedResourceItems = computed<ResourceItem[]>(() => {
+  if (!showPagination.value) return resourceItems.value
+  const start = (currentPage.value - 1) * pageSize.value
+  return resourceItems.value.slice(start, start + pageSize.value)
+})
+
+// 分页操作（通用分页组件回调）
+function handlePageChange(page: number) {
+  const safe = Math.min(Math.max(1, page), pageCount.value)
+  currentPage.value = safe
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+function handlePageSizeChange(size: number) {
+  pageSize.value = size
+  currentPage.value = 1
+}
+
+// 练习模式或资源列表变化时重置到第一页
+watch([activePracticeKey, resourceItems], () => {
+  if (showPagination.value) currentPage.value = 1
+})
 
 watch(activeProjectId, () => {
   const firstSubject = projects
@@ -1218,20 +1372,96 @@ function handleStartExam(item: ResourceItem) {
   })
 }
 
+// 统一入口：开始做题（章节或小节）
+// 无需参数，后续可扩展为接受试卷ID或标题
+const startExam = () => {
+  router.push('/student/exam/senior-acc-practice-real-2024')
+}
+
+// 章节练习树相关逻辑
+interface ChapterSection { id: string; title: string }
+interface ChapterNode {
+  id: string
+  order: string
+  title: string
+  sections: ChapterSection[]
+  total: number
+  done: number
+  accuracy: number
+}
+
+// 展开状态
+const expandedChapterIds = ref<Set<string>>(new Set())
+const isChapterExpanded = (id: string) => expandedChapterIds.value.has(id)
+function toggleChapter(id: string) {
+  const next = new Set(expandedChapterIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedChapterIds.value = next
+}
+
+const activeChapterTitle = ref('')
+
+function selectChapterNode(node: { title?: string }) {
+  activeChapterTitle.value = node.title || ''
+  // 可在此联动统计预览或跳转，当前保持样式展示
+}
+
+function redoByChapter(title: string) {
+  activeChapterTitle.value = title
+  // 在此处可以接入答题页面路由跳转
+}
+
+function analysisByChapter(title: string) {
+  activeChapterTitle.value = title
+  // 在此处可以接入解析页面路由跳转
+}
+
+// 将章节练习的 ResourceItem 转换为树形章节结构
+const chapterTree = computed<ChapterNode[]>(() => {
+  if (activePracticeKey.value !== 'chapter') return []
+  const list = resourceItems.value
+  return list.slice(0, 6).map((item, idx) => {
+    const order = `第${idx + 1}章`
+    const parsedTitle = item.title
+      .replace(/^第\d+章\s*·\s*/, '')
+      .replace(/专项练习$/, '') || item.title
+
+    const sections: ChapterSection[] = [
+      { id: `${item.id}-sec-1`, title: '第一节 社会工作的内涵' },
+      { id: `${item.id}-sec-2`, title: '第二节 社会工作的基本原则' },
+      { id: `${item.id}-sec-3`, title: '第三节 社会工作的主要领域' }
+    ]
+
+    // 从生成试卷时的 totalQuestions 构造统计（示例：正确率=0、已做=0）
+    // 如果后端返回真实统计，替换为接口数据即可
+    const totalMatch = item.subtitle.match(/总题：0\/(\d+)/)
+    const total = totalMatch ? Number(totalMatch[1]) : 0
+
+    return {
+      id: item.id,
+      order,
+      title: parsedTitle,
+      sections,
+      total,
+      done: 0,
+      accuracy: 0
+    }
+  })
+})
+
+// 当切换科目或模式时重置展开状态
+watch([activeSubjectId, activePracticeKey], () => {
+  expandedChapterIds.value = new Set()
+  activeChapterTitle.value = ''
+})
+
 syncPracticeState()
 </script>
 
 <style scoped>
 :root {
   color-scheme: light;
-  --brand-primary: #ff6f3c;
-  --brand-primary-hover: #ff8a55;
-  --brand-secondary: #fff1eb;
-  --brand-deep: #d23e1c;
-  --text-primary: #333333;
-  --text-secondary: #808080;
-  --card-border: #eceff4;
-  --accent: var(--brand-primary);
 }
 
 .student-page {
@@ -1240,6 +1470,18 @@ syncPracticeState()
   min-height: 100vh;
   background: #f4f5f7;
   color: var(--text-primary);
+  --brand-primary: #ff6f3c;
+  --brand-primary-hover: #ff8a55;
+  --brand-secondary: #fff1eb;
+  --brand-deep: #d23e1c;
+  --text-primary: #333333;
+  --text-secondary: #808080;
+  --accent: var(--brand-primary);
+  --student-primary: #ff443d;
+  --student-primary-dark: #e63a33;
+  --primary-text: #2c3e50;
+  --secondary-text: #5a6c7d;
+  --card-border: #e4eaf2;
 }
 
 .sidebar {
@@ -1351,7 +1593,9 @@ syncPracticeState()
 }
 
 .sidebar-card {
-  margin-top: auto;
+  position: fixed;
+  bottom: 60px;
+  left: 58px;
   padding: 14px 12px;
   border-radius: 14px;
   border: 1px solid rgba(255, 111, 60, 0.12);
@@ -1387,8 +1631,8 @@ syncPracticeState()
 .tab-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 0;
+  gap: 16px;
+  padding: 22px;
 }
 
 .main-header {
@@ -1466,11 +1710,12 @@ syncPracticeState()
 }
 
 .filter-section {
-  padding: 14px 20px;
   background: #ffffff;
   border-radius: 16px;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
+  padding: 18px 20px;
+  /* box-shadow: 0 -2px 14px 0 rgba(0,0,0,.06);*/
+  box-shadow: 0 6px 24px rgba(17, 36, 80, 0.06); 
+  border: 1px solid #e4eaf2;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1516,41 +1761,45 @@ syncPracticeState()
 
 .subject-tabs {
   display: flex;
+  gap: 12px;
   flex-wrap: wrap;
-  gap: 10px;
   flex: 1;
 }
 
 .subject-tab {
-  position: relative;
-  padding: 8px 16px;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  color: var(--text-secondary);
+  padding: 10px 24px;
+  background: #ffffff;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--primary-text);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s;
+  font-weight: 500;
+  position: relative;
 }
 
-.subject-tab:hover {
-  color: var(--brand-primary);
+.subject-tab:hover:not(.is-active) {
+  background: #f8f9fb;
+  border-color: #d0d5dd;
 }
 
 .subject-tab.is-active {
-  color: var(--brand-primary);
+  background: rgba(255, 68, 61, 0.12);
+  border-color: var(--student-primary);
+  color: var(--student-primary);
   font-weight: 600;
 }
 
 .subject-tab.is-active::after {
   content: '';
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: -6px;
+  bottom: 0;
+  left: 16px;
+  right: 16px;
   height: 3px;
-  border-radius: 3px;
-  background: var(--brand-primary);
+  background: var(--student-primary);
+  border-radius: 2px 2px 0 0;
 }
 
 .subject-badge {
@@ -1570,8 +1819,8 @@ syncPracticeState()
 .stat-grid {
   background: #ffffff;
   border-radius: 16px;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
+  border: 1px solid #e4eaf2;
+  box-shadow: 0 6px 10px rgba(17, 36, 80, 0.06);
   padding: 12px 18px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1582,7 +1831,7 @@ syncPracticeState()
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-radius: 12px;
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -1640,11 +1889,11 @@ syncPracticeState()
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 16px 18px;
+  padding: 20px;
   background: #ffffff;
   border-radius: 16px;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 12px 24px rgba(17, 36, 80, 0.06);
+  box-shadow: 0 6px 24px rgba(17, 36, 80, 0.06);
+  border: 1px solid #e4eaf2;
 }
 
 .practice-item {
@@ -1692,8 +1941,8 @@ syncPracticeState()
 .resource-panel {
   background: #ffffff;
   border-radius: 18px;
-  border: 1px solid var(--card-border);
-  box-shadow: 0 16px 30px rgba(17, 36, 80, 0.07);
+  box-shadow: 0 6px 24px rgba(17, 36, 80, 0.06);
+  border: 1px solid #e4eaf2;
   padding: 18px 22px 22px;
   display: flex;
   flex-direction: column;
@@ -2160,6 +2409,380 @@ syncPracticeState()
   color: var(--brand-primary);
   font-weight: 600;
   margin-right: 4px;
+}
+
+/* 章节树卡片 */
+.chapter-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.chapter-card {
+  border: 1px solid #f1f2f3;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  background: #fff;
+  padding: 12px 16px;
+}
+
+.chapter-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chapter-toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #e4eaf2;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.chapter-toggle-icon {
+  position: relative;
+  width: 14px;
+  height: 14px;
+}
+.chapter-toggle-icon::before,
+.chapter-toggle-icon::after {
+  content: '';
+  position: absolute;
+  background: #7b8794;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+.chapter-toggle-icon::before {
+  left: 2px;
+  right: 2px;
+  top: 6px;
+  height: 2px;
+}
+.chapter-toggle-icon::after {
+  top: 2px;
+  bottom: 2px;
+  left: 6px;
+  width: 2px;
+}
+.chapter-toggle-icon.expanded::after {
+  opacity: 0;
+}
+
+.chapter-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.chapter-order {
+  color: #222;
+  font-weight: 600;
+}
+.chapter-name {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.chapter-sections {
+  margin-top: 12px;
+  border-top: 1px dashed #e4eaf2;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 6px;
+  border-radius: 8px;
+}
+
+.section-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: #2c3e50;
+  font-size: 13px;
+}
+
+.section-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff443d;
+}
+
+.section-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn.btn-link {
+  color: #ff4d4f;
+  background: transparent;
+  border: none;
+  padding: 0 8px;
+}
+.btn.btn-link:hover {
+  text-decoration: underline;
+}
+
+.btn-outline {
+  color: #ff443d;
+  border: 1px solid #ff443d;
+  background: #fff;
+}
+.btn-outline:hover {
+  background: rgba(255, 68, 61, 0.06);
+}
+.btn.btn-primary {
+  background: linear-gradient(135deg, #ff7a59 0%, #ff4d4f 100%);
+  color: #fff;
+  border: none;
+  height: 32px;
+  line-height: 32px;
+  padding: 0 16px;
+  border-radius: 20px;
+  box-shadow: 0 6px 16px rgba(255, 77, 79, 0.25);
+}
+.btn.btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+.chapter-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f2f2f2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.chapter-meta {
+  color: #6b6f76;
+  font-size: 14px;
+}
+.chapter-meta strong {
+  color: #ff4d4f;
+  font-weight: 700;
+}
+
+.footer-left {
+  font-size: 12px;
+  color: #5a6c7d;
+}
+.footer-count {
+  color: #ff443d;
+  font-weight: 600;
+  margin-left: 4px;
+}
+.footer-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.chapter-slide-enter-active,
+.chapter-slide-leave-active {
+  transition: all 0.2s ease;
+}
+.chapter-slide-enter-from,
+.chapter-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+
+/* 卡片与主行 */
+.chapter-card {
+  border: 1px solid #f1f2f3;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+.chapter-card + .chapter-card {
+  margin-top: 12px;
+}
+
+.chapter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.chapter-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.chapter-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.chapter-order { color: #999; font-weight: 500; }
+.chapter-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
+}
+
+/* 中右区域：徽标 + 统计 + 按钮 */
+.chapter-extra {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.chapter-badges .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #fff8f3;
+  color: #ff7a00;
+  border: 1px dashed #ffb38a;
+  font-size: 12px;
+}
+.badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #ff7a00;
+  display: inline-block;
+}
+
+/* 右侧：统计 + 按钮 */
+.chapter-meta, .section-meta { color: #6b6f76; font-size: 14px; }
+.chapter-meta strong, .section-meta strong { color: #ff4d4f; font-weight: 700; }
+.meta-split { margin: 0 8px; color: #d0d3d8; }
+
+/* 按钮风格 */
+.btn { cursor: pointer; }
+.btn.btn-primary {
+  background: linear-gradient(135deg, #ff7a59 0%, #ff4d4f 100%);
+  color: #fff; border: none; height: 32px; line-height: 32px;
+  padding: 0 16px; border-radius: 20px; box-shadow: 0 6px 16px rgba(255, 77, 79, 0.25);
+}
+.btn.btn-primary:hover { filter: brightness(1.05); }
+.btn.btn-secondary {
+  background: #f4f5f7; color: #333; border: 1px solid #e6e8eb;
+  height: 32px; line-height: 32px; padding: 0 14px; border-radius: 18px;
+}
+.btn.btn-secondary:hover { background: #eef0f3; }
+.btn.btn-danger {
+  background: #ffefe9; color: #ff4d4f; border: 1px solid #ffc2b8;
+  height: 32px; line-height: 32px; padding: 0 14px; border-radius: 18px;
+}
+.btn.btn-danger:hover { background: #ffe6de; }
+
+/* 展开区与原样式保持一致 */
+.chapter-sections { padding: 8px 16px 12px 40px; }
+
+.section-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed #f0f0f0;
+}
+.section-row:last-child { border-bottom: none; }
+.section-info { display: flex; align-items: center; gap: 8px; }
+.section-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff7a00; }
+.section-actions .btn {
+  height: 28px; line-height: 28px; padding: 0 12px; border-radius: 16px;
+}
+
+/* 展开/收起按钮：橙色圆形 + / - */
+.chapter-toggle { border: none; background: transparent; cursor: pointer; }
+
+.chapter-toggle-icon {
+  width: 20px; height: 20px; display: inline-block;
+  border: 1px solid #ffb38a; border-radius: 50%;
+  background: #fff8f3; position: relative;
+}
+.chapter-toggle-icon::before,
+.chapter-toggle-icon::after {
+  content: ''; position: absolute; background: #ff7a00;
+}
+.chapter-toggle-icon::before { width: 12px; height: 2px; top: 9px; left: 4px; }
+.chapter-toggle-icon::after { width: 2px; height: 12px; top: 4px; left: 9px; }
+.chapter-toggle-icon.expanded::after { display: none; }
+
+/* 分页样式 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.page-btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 18px;
+  background: #f4f5f7;
+  border: 1px solid #e6e8eb;
+  color: #333;
+  cursor: pointer;
+}
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-list {
+  display: flex;
+  gap: 8px;
+}
+
+.page-index {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e6e8eb;
+  color: #333;
+  cursor: pointer;
+}
+.page-index.is-active {
+  background: #ffefe9;
+  border-color: #ffc2b8;
+  color: #ff4d4f;
+  font-weight: 600;
 }
 </style>
 

@@ -12,11 +12,14 @@
               :subject-id="activeSubject.id"
               :subject-name="activeSubject.name"
               :project-name="activeSubject.projectName"
-              :knowledge-points="currentKnowledgePoints"
+              :knowledge-points="filteredKnowledgePoints"
+              :status-filter="statusFilter"
               @add-knowledge-point="openAddKnowledgePointModal"
               @edit-knowledge-point="openEditKnowledgePointModal"
               @delete-knowledge-point="openDeleteKnowledgePointModal"
+              @toggle-status="openToggleStatusModal"
               @show-questions="openQuestionListModal"
+              @update:status-filter="statusFilter = $event"
             />
           </div>
         </div>
@@ -66,6 +69,10 @@
                   <li><strong>章节显示规则</strong>: 多个章节以"、"分隔显示,章节名称过长时截断并添加省略号,鼠标悬停显示完整名称</li>
                   <li><strong>删除二次确认</strong>: 删除知识点时必须二次确认,有试题关联时额外提示影响范围</li>
                   <li><strong>科目筛选规则</strong>: 左侧树形菜单选中科目后,右侧仅显示该科目的知识点,切换科目时列表实时更新</li>
+                  <li><strong>禁用不删除数据</strong>: 禁用知识点不清空试题的knowledgePointIds字段,试题仍可正常查看和编辑</li>
+                  <li><strong>状态筛选规则</strong>: 默认筛选器为"启用",禁用知识点不显示;切换筛选器为"全部"或"禁用"时可查看</li>
+                  <li><strong>试题编辑限制</strong>: 试题编辑时,已禁用知识点显示"(已禁用)"后缀,可移除但不可新增关联</li>
+                  <li><strong>启用操作无确认</strong>: 启用知识点无损操作,无需二次确认;禁用操作需二次确认并显示影响范围</li>
                 </ul>
               </div>
             </section>
@@ -92,7 +99,7 @@
                   <tr>
                     <td>知识点列表</td>
                     <td>表格展示知识点信息</td>
-                    <td>包含知识点名称、关联章节、试题数量、创建时间、创建人、操作列</td>
+                    <td>包含知识点名称、章、节、试题数量、创建时间、创建人、操作列</td>
                     <td>P0</td>
                   </tr>
                   <tr>
@@ -120,9 +127,9 @@
                     <td>P0</td>
                   </tr>
                   <tr>
-                    <td>章节关联显示</td>
-                    <td>显示知识点关联的章节名称</td>
-                    <td>多个章节以"、"分隔;无关联显示"未关联章节"</td>
+                    <td>章/节拆分显示</td>
+                    <td>表格拆分为"章"和"节"两列,分别显示关联的章节名称和小节名称</td>
+                    <td>"章"列显示章节名称(用"、"分隔);"节"列显示所有小节名称(平铺,用"、"分隔);内容超过10个字显示"...",鼠标悬停显示完整内容;无关联显示"未关联章节"/"无小节"</td>
                     <td>P0</td>
                   </tr>
                   <tr>
@@ -148,6 +155,30 @@
                     <td>在当前科目下搜索知识点</td>
                     <td>右上角搜索框,实时过滤知识点名称,支持模糊匹配</td>
                     <td>P2</td>
+                  </tr>
+                  <tr>
+                    <td>启用/禁用知识点</td>
+                    <td>操作列新增【启用/禁用】按钮</td>
+                    <td>启用状态显示"禁用"按钮,点击后二次确认;禁用状态显示"启用"按钮,点击后直接执行;切换后刷新列表</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>状态筛选</td>
+                    <td>右上角新增"启用状态"筛选下拉框</td>
+                    <td>默认"启用",可选"全部/启用/禁用",实时更新列表</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>禁用影响提示</td>
+                    <td>禁用前弹出确认提示,显示关联试题数量和影响范围</td>
+                    <td>试题数量>0时显示详细影响,试题数量=0时简化提示</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>状态徽章显示</td>
+                    <td>禁用知识点名称旁显示"已禁用"徽章</td>
+                    <td>淡红色背景,深红色文字,圆角徽章</td>
+                    <td>P0</td>
                   </tr>
                 </tbody>
               </table>
@@ -176,13 +207,31 @@
                     <td>支持中文、英文、数字</td>
                   </tr>
                   <tr>
-                    <td>关联章节</td>
+                    <td>章</td>
+                    <td>Computed</td>
+                    <td>基于chapterIds计算</td>
+                    <td>✗</td>
+                    <td>无</td>
+                    <td>-</td>
+                    <td>显示章节名称,用"、"分隔,超过10字显示"...",悬浮显示完整内容</td>
+                  </tr>
+                  <tr>
+                    <td>节</td>
+                    <td>Computed</td>
+                    <td>基于chapterIds计算</td>
+                    <td>✗</td>
+                    <td>无</td>
+                    <td>-</td>
+                    <td>显示所有小节名称(平铺),用"、"分隔,超过10字显示"...",悬浮显示完整内容</td>
+                  </tr>
+                  <tr>
+                    <td>关联章节ID列表</td>
                     <td>Array</td>
                     <td>0-N个章节ID</td>
                     <td>✗</td>
                     <td>无</td>
                     <td>[]</td>
-                    <td>允许不关联章节</td>
+                    <td>底层数据字段,允许不关联章节</td>
                   </tr>
                   <tr>
                     <td>试题关联</td>
@@ -237,6 +286,15 @@
                     <td>全局唯一</td>
                     <td>自动生成</td>
                     <td>系统自动生成,不可修改</td>
+                  </tr>
+                  <tr>
+                    <td>知识点状态</td>
+                    <td>Enum</td>
+                    <td>active/disabled</td>
+                    <td>✓</td>
+                    <td>无</td>
+                    <td>active</td>
+                    <td>禁用后不影响试题关联</td>
                   </tr>
                 </tbody>
               </table>
@@ -361,6 +419,54 @@
                       <td>点击"创建时间"列的排序按钮</td>
                       <td>列表按创建时间升序/降序排序,最新创建的知识点排在前面(降序)或后面(升序)</td>
                     </tr>
+                    <tr>
+                      <td>AC-19</td>
+                      <td>知识点"现金流量管理"已被10道试题引用,状态为"启用"</td>
+                      <td>用户点击操作列【禁用】按钮,查看确认弹窗内容,点击【确认禁用】</td>
+                      <td>弹窗显示"该知识点已被10道试题引用",确认后知识点状态变为"disabled",如果筛选器为"启用",该知识点从列表中消失,Toast提示"知识点已禁用",试题的knowledgePointIds数组不清空</td>
+                    </tr>
+                    <tr>
+                      <td>AC-20</td>
+                      <td>知识点"财务分析基础"未被任何试题引用,状态为"启用"</td>
+                      <td>用户点击操作列【禁用】按钮,查看确认弹窗内容,点击【确认禁用】</td>
+                      <td>弹窗显示简化提示,不显示试题数量,确认后知识点状态变为"disabled",Toast提示"知识点已禁用"</td>
+                    </tr>
+                    <tr>
+                      <td>AC-21</td>
+                      <td>知识点"税收优惠政策"状态为"禁用",当前筛选器为"全部"</td>
+                      <td>用户点击操作列【启用】按钮</td>
+                      <td>无二次确认弹窗,知识点状态立即变为"active","已禁用"徽章消失,Toast提示"知识点已启用"</td>
+                    </tr>
+                    <tr>
+                      <td>AC-22</td>
+                      <td>科目"财务战略管理"下有8个启用知识点,2个禁用知识点</td>
+                      <td>左侧树选中该科目,页面加载完成</td>
+                      <td>筛选器默认选中"启用",表格仅显示8个启用知识点,禁用知识点不显示</td>
+                    </tr>
+                    <tr>
+                      <td>AC-23</td>
+                      <td>用户在"财务战略管理"科目下,当前筛选器为"启用"</td>
+                      <td>选择筛选器"禁用"</td>
+                      <td>表格立即刷新,显示2个禁用知识点,启用知识点不显示,禁用知识点的名称旁显示"已禁用"徽章</td>
+                    </tr>
+                    <tr>
+                      <td>AC-24</td>
+                      <td>用户在"财务战略管理"科目下,当前筛选器为"启用"</td>
+                      <td>选择筛选器"全部"</td>
+                      <td>表格显示所有10个知识点(8个启用+2个禁用),禁用知识点的名称旁显示"已禁用"徽章,启用知识点正常显示</td>
+                    </tr>
+                    <tr>
+                      <td>AC-25</td>
+                      <td>试题Q001关联了已禁用知识点"财务报表分析方法"</td>
+                      <td>用户在试题管理页面打开该试题编辑弹窗,查看知识点关联字段</td>
+                      <td>关联列表显示"财务报表分析方法(已禁用)",可点击删除按钮移除关联,知识点下拉选择器不显示该已禁用知识点</td>
+                    </tr>
+                    <tr>
+                      <td>AC-26</td>
+                      <td>用户在"财务战略管理"科目下,筛选器为"启用",仅显示1个知识点</td>
+                      <td>用户禁用该唯一知识点,确认禁用操作</td>
+                      <td>该知识点从列表中消失,显示空状态提示"当前科目下没有启用的知识点",提示文案下方显示"可通过筛选器查看已禁用知识点"</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -453,6 +559,9 @@ const tabs = [
 // 当前选中的科目
 const activeSubject = ref<SubjectTreeNode | null>(null)
 
+// 状态筛选
+const statusFilter = ref<string>('active')
+
 // 弹窗控制
 const addModalVisible = ref(false)
 const editModalVisible = ref(false)
@@ -462,11 +571,12 @@ const questionListModalVisible = ref(false)
 // 编辑状态
 const editingKnowledgePoint = ref<KnowledgePoint | null>(null)
 
-// 删除确认状态
+// 删除/禁用确认状态
 const deleteModalTitle = ref('')
 const deleteModalMessage = ref('')
 const deleteModalError = ref('')
 const deletingKnowledgePoint = ref<KnowledgePoint | null>(null)
+const confirmActionType = ref<'delete' | 'disable'>('delete')
 
 // 试题列表弹窗状态
 const selectedKnowledgePointId = ref('')
@@ -478,6 +588,16 @@ const selectedKnowledgePointName = ref('')
 const currentKnowledgePoints = computed(() => {
   if (!activeSubject.value) return []
   return knowledgePointStore.getKnowledgePointsBySubject(activeSubject.value.id).value
+})
+
+/**
+ * 根据状态筛选的知识点列表
+ */
+const filteredKnowledgePoints = computed(() => {
+  if (statusFilter.value === 'all') {
+    return currentKnowledgePoints.value
+  }
+  return currentKnowledgePoints.value.filter(kp => kp.status === statusFilter.value)
 })
 
 /**
@@ -544,6 +664,7 @@ const handleEditKnowledgePoint = (id: string, updates: Partial<KnowledgePointFor
  * 打开删除知识点确认弹窗
  */
 const openDeleteKnowledgePointModal = (kp: KnowledgePoint) => {
+  confirmActionType.value = 'delete'
   deletingKnowledgePoint.value = kp
   deleteModalTitle.value = '确认删除知识点'
 
@@ -559,17 +680,60 @@ const openDeleteKnowledgePointModal = (kp: KnowledgePoint) => {
 }
 
 /**
- * 处理删除确认
+ * 处理删除/禁用确认
  */
 const handleDeleteConfirm = () => {
   if (!deletingKnowledgePoint.value) return
 
   try {
-    knowledgePointStore.deleteKnowledgePoint(deletingKnowledgePoint.value.id)
-    showToast('知识点删除成功', { type: 'success' })
+    if (confirmActionType.value === 'delete') {
+      knowledgePointStore.deleteKnowledgePoint(deletingKnowledgePoint.value.id)
+      showToast('知识点删除成功', { type: 'success' })
+    } else {
+      handleToggleStatus(deletingKnowledgePoint.value)
+    }
     deleteModalVisible.value = false
   } catch (error) {
     deleteModalError.value = (error as Error).message
+  }
+}
+
+/**
+ * 打开启用/禁用确认弹窗
+ */
+const openToggleStatusModal = (kp: KnowledgePoint) => {
+  // 如果是启用操作,直接执行
+  if (kp.status === 'disabled') {
+    handleToggleStatus(kp)
+    return
+  }
+
+  // 如果是禁用操作,显示确认弹窗
+  confirmActionType.value = 'disable'
+  deletingKnowledgePoint.value = kp
+  deleteModalTitle.value = '确认禁用知识点'
+
+  const questionCount = knowledgePointStore.getQuestionCountByKnowledgePoint(kp.id)
+  if (questionCount > 0) {
+    deleteModalMessage.value = `确定要禁用知识点"${kp.name}"吗?\n\n禁用后的影响:\n· 该知识点已被 ${questionCount} 道试题引用\n· 禁用后,学生在答题界面将看不到该知识点标签\n· 试题本身不受影响,仍可正常查看和编辑\n· 知识点管理页面默认不显示已禁用项,可通过筛选查看`
+  } else {
+    deleteModalMessage.value = `确定要禁用知识点"${kp.name}"吗?\n\n禁用后可通过筛选器重新启用。`
+  }
+
+  deleteModalError.value = ''
+  deleteModalVisible.value = true
+}
+
+/**
+ * 处理状态切换
+ */
+const handleToggleStatus = (kp: KnowledgePoint) => {
+  try {
+    knowledgePointStore.toggleKnowledgePointStatus(kp.id)
+    const message = kp.status === 'active' ? '知识点已禁用' : '知识点已启用'
+    showToast(message, { type: 'success' })
+  } catch (error) {
+    showToast((error as Error).message, { type: 'error' })
   }
 }
 

@@ -68,6 +68,12 @@
                   <li><strong>手动调序</strong>: 支持通过上下箭头调整阶段顺序，排序号自动重新分配</li>
                   <li><strong>描述选填</strong>: 阶段描述为可选字段，建议填写以提供更好的指导</li>
                   <li><strong>科目关联</strong>: 学习阶段必须隶属于某个科目，随科目变化而独立管理</li>
+                  <li><strong>阶段类型可配置</strong>: 阶段类型可由管理员动态配置，系统预设"章节练习"、"历年真题"、"考前冲刺"、"入学测试"等类型，可根据实际需求扩展</li>
+                  <li><strong>阶段名称规范</strong>: 建议使用阶段类型名称作为学习阶段名称（如"章节练习"、"历年真题"），便于学生理解，也可添加描述性后缀（如"章节练习-基础巩固"）</li>
+                  <li><strong>资源关联规则</strong>: 章节练习类型关联题库管理（单个题目），其他类型（历年真题、考前冲刺、入学测试）关联试卷管理（完整试卷）</li>
+                  <li><strong>资源筛选配置</strong>: 不同阶段类型支持不同的筛选条件（章节练习按章节筛选，试卷类型按标签/难度/年份筛选）</li>
+                  <li><strong>删除保护</strong>: 学习阶段已被使用时（存在学生学习记录、练习记录、学习进度等）不允许删除，系统提示"该学习阶段已被使用，无法删除。请先清理相关学习记录"</li>
+                  <li><strong>禁用提示</strong>: 禁用学习阶段时给出二次确认提示："确定要禁用学习阶段「阶段名称」吗？"</li>
                 </ul>
               </div>
             </section>
@@ -119,9 +125,9 @@
                   </tr>
                   <tr>
                     <td>删除阶段</td>
-                    <td>阶段行【删除】按钮触发确认弹窗</td>
+                    <td>阶段行【删除】按钮触发删除前置检查</td>
                     <td>
-                      二次确认后删除，删除后自动调整其他阶段的排序号
+                      检查是否被使用（有学生学习记录、练习记录等）→ 被使用时禁止删除并提示；未使用时二次确认后删除，删除后自动调整其他阶段的排序号
                     </td>
                     <td>P0</td>
                   </tr>
@@ -146,6 +152,22 @@
                       未选择科目显示"请先从左侧选择一个科目"；科目下无阶段显示"暂无学习阶段数据"并提供添加按钮
                     </td>
                     <td>P1</td>
+                  </tr>
+                  <tr>
+                    <td>阶段类型选择</td>
+                    <td>添加/编辑时选择阶段类型</td>
+                    <td>
+                      必选字段，下拉选择4种类型（章节练习/历年真题/考前冲刺/入学测试），选择后系统自动关联对应资源类型
+                    </td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>资源配置</td>
+                    <td>配置阶段关联的学习资源</td>
+                    <td>
+                      根据阶段类型动态显示：章节练习显示章节选择器（多选），其他类型显示试卷筛选器（标签/难度/年份等）
+                    </td>
+                    <td>P0</td>
                   </tr>
                 </tbody>
               </table>
@@ -199,8 +221,105 @@
                     <td>系统自动填充</td>
                     <td>2025-01-05 09:00</td>
                   </tr>
+                  <tr>
+                    <td>阶段类型</td>
+                    <td>枚举</td>
+                    <td>-</td>
+                    <td>必填，从已配置的阶段类型中选择</td>
+                    <td>系统预设：chapter-practice（章节练习）、past-papers（历年真题）、pre-exam-sprint（考前冲刺）、entrance-test（入学测试），管理员可动态配置扩展</td>
+                  </tr>
+                  <tr>
+                    <td>资源类型</td>
+                    <td>枚举</td>
+                    <td>-</td>
+                    <td>系统自动填充，根据阶段类型确定</td>
+                    <td>question（题库）、exam（试卷）</td>
+                  </tr>
+                  <tr>
+                    <td>资源筛选条件</td>
+                    <td>JSON对象</td>
+                    <td>-</td>
+                    <td>根据阶段类型不同而不同</td>
+                    <td>章节练习：{ chapterIds: ['ch-001', 'ch-002'] }<br/>其他类型：{ tags: ['2024年', '真题'], difficulty: 'hard' }</td>
+                  </tr>
                 </tbody>
               </table>
+            </section>
+
+            <section class="resource-config-rules">
+              <h3>资源配置规则</h3>
+              <p>不同类型的学习阶段关联不同的学习资源，以下是系统预设的4种阶段类型配置规则（管理员可根据实际需求动态配置扩展）：</p>
+
+              <table class="spec-table">
+                <thead>
+                  <tr>
+                    <th width="15%">阶段类型</th>
+                    <th width="15%">资源来源</th>
+                    <th width="35%">筛选条件配置</th>
+                    <th width="35%">使用场景</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>章节练习<br/>(chapter-practice)</td>
+                    <td>题库管理<br/>(单个题目)</td>
+                    <td>
+                      <strong>章节选择</strong>：多选当前科目下的章节<br/>
+                      <strong>示例</strong>：{ chapterIds: ['ch-001', 'ch-002', 'ch-003'] }<br/>
+                      <strong>题目来源</strong>：从选中章节中随机抽取题目
+                    </td>
+                    <td>
+                      学生按章节进行针对性练习，巩固该章节知识点，支持错题回顾和收藏功能
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>历年真题<br/>(past-papers)</td>
+                    <td>试卷管理<br/>(完整试卷)</td>
+                    <td>
+                      <strong>标签筛选</strong>：选择包含"真题"标签的试卷<br/>
+                      <strong>年份筛选</strong>：选择特定年份（如2023年、2024年）<br/>
+                      <strong>示例</strong>：{ tags: ['真题', '2024年'] }
+                    </td>
+                    <td>
+                      学生模拟真实考试环境，完整作答历年考试真题，了解考试难度和题型分布
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>考前冲刺<br/>(pre-exam-sprint)</td>
+                    <td>试卷管理<br/>(完整试卷)</td>
+                    <td>
+                      <strong>标签筛选</strong>：选择"冲刺"、"重点"标签<br/>
+                      <strong>难度筛选</strong>：选择难度等级（简单/中等/困难）<br/>
+                      <strong>示例</strong>：{ tags: ['冲刺', '重点'], difficulty: 'hard' }
+                    </td>
+                    <td>
+                      考前集中训练，针对高频考点和难点进行强化，提升应试能力
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>入学测试<br/>(entrance-test)</td>
+                    <td>试卷管理<br/>(完整试卷)</td>
+                    <td>
+                      <strong>标签筛选</strong>：选择"入学测试"、"摸底"标签<br/>
+                      <strong>试卷类型</strong>：选择测评类试卷<br/>
+                      <strong>示例</strong>：{ tags: ['入学测试', '摸底'], examType: 'assessment' }
+                    </td>
+                    <td>
+                      新生入学前的水平测试，评估学生当前知识掌握程度，为后续学习提供参考
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="requirement-section" style="margin-top: 20px;">
+                <h4>资源配置验证规则</h4>
+                <ul>
+                  <li><strong>类型匹配校验</strong>: 章节练习只能配置题库资源，其他类型只能配置试卷资源</li>
+                  <li><strong>资源存在校验</strong>: 配置的章节ID或试卷标签必须在系统中真实存在</li>
+                  <li><strong>资源数量校验</strong>: 章节练习至少选择1个章节，试卷类型至少匹配1份试卷</li>
+                  <li><strong>动态更新机制</strong>: 当章节或试卷被删除时，系统自动提示管理员更新受影响的学习阶段配置</li>
+                </ul>
+              </div>
             </section>
 
             <section class="acceptance-criteria">
@@ -279,6 +398,32 @@
                       - 列表中显示更新后的内容<br />
                       - 排序号不变<br />
                       - 提示"编辑成功"
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>删除被使用的学习阶段</td>
+                    <td>
+                      1. 选择一个已有学生学习记录的学习阶段<br />
+                      2. 点击【删除】按钮<br />
+                      3. 观察提示信息
+                    </td>
+                    <td>
+                      - 显示错误提示"该学习阶段已被使用，无法删除。请先清理相关学习记录"<br />
+                      - 阶段未被删除<br />
+                      - 不显示二次确认弹窗
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>禁用学习阶段提示</td>
+                    <td>
+                      1. 点击某个启用状态学习阶段的【禁用】按钮<br />
+                      2. 查看确认提示信息<br />
+                      3. 点击【确认】
+                    </td>
+                    <td>
+                      - 显示提示"确定要禁用学习阶段「阶段名称」吗？"<br />
+                      - 确认后阶段状态变更为"禁用"<br />
+                      - 提示"操作成功"
                     </td>
                   </tr>
                 </tbody>
@@ -411,6 +556,16 @@
       @update:visible="isDeleteModalVisible = $event"
       @confirm="handleDeleteConfirm"
     />
+
+    <!-- 启用/禁用确认弹窗 -->
+    <ToggleStatusConfirmModal
+      :visible="isToggleStatusModalVisible"
+      :action-type="toggleActionType"
+      :message="toggleMessage"
+      entity-name="学习阶段"
+      @update:visible="isToggleStatusModalVisible = $event"
+      @confirm="handleToggleStatusConfirm"
+    />
   </AppLayout>
 </template>
 
@@ -423,6 +578,7 @@ import LearningStageTable from './components/LearningStageTable.vue'
 import AddLearningStageModal from './components/AddLearningStageModal.vue'
 import EditLearningStageModal from './components/EditLearningStageModal.vue'
 import DeleteConfirmModal from './components/DeleteConfirmModal.vue'
+import ToggleStatusConfirmModal from '@/components/ToggleStatusConfirmModal.vue'
 import { useLearningStageStore } from '@/stores/learningStage'
 import { useToast } from '@/composables/useToast'
 import type { SubjectTreeNode, LearningStage, LearningStageFormData } from './types'
@@ -460,6 +616,12 @@ const currentStage = ref<LearningStage | null>(null)
 const isAddModalVisible = ref(false)
 const isEditModalVisible = ref(false)
 const isDeleteModalVisible = ref(false)
+const isToggleStatusModalVisible = ref(false)
+
+// 启用/禁用确认弹窗相关状态
+const toggleActionType = ref<'enable' | 'disable'>('enable')
+const toggleMessage = ref('')
+const toggleStage = ref<LearningStage | null>(null)
 
 /**
  * 科目切换事件
@@ -533,14 +695,36 @@ const handleEditSubmit = (id: string, data: LearningStageFormData) => {
 }
 
 /**
- * 处理切换启用/禁用状态
+ * 处理切换启用/禁用状态 - 显示确认弹窗
  */
 const handleToggleStatus = (stage: LearningStage) => {
-  const result = learningStageStore.toggleLearningStageStatus(stage.id)
+  toggleStage.value = stage
+
+  if (stage.status === 'active') {
+    // 禁用操作
+    toggleActionType.value = 'disable'
+    toggleMessage.value = `确定要禁用学习阶段「${stage.name}」吗？`
+  } else {
+    // 启用操作
+    toggleActionType.value = 'enable'
+    toggleMessage.value = `确定要启用学习阶段「${stage.name}」吗？`
+  }
+
+  isToggleStatusModalVisible.value = true
+}
+
+/**
+ * 确认切换启用/禁用状态
+ */
+const handleToggleStatusConfirm = () => {
+  if (!toggleStage.value) return
+
+  const result = learningStageStore.toggleLearningStageStatus(toggleStage.value.id)
 
   if (result.success) {
-    const newStatus = stage.status === 'active' ? '禁用' : '启用'
+    const newStatus = toggleStage.value.status === 'active' ? '禁用' : '启用'
     showToast(`${newStatus}成功`)
+    isToggleStatusModalVisible.value = false
   } else {
     showToast(result.message || '操作失败', { type: 'error' })
   }

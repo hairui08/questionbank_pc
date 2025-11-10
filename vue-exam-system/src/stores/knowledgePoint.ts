@@ -203,6 +203,30 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
   }
 
   /**
+   * 分页获取知识点关联的试题列表
+   */
+  const getPaginatedQuestionsByKnowledgePoint = (
+    knowledgePointId: string,
+    page: number = 1,
+    pageSize: number = 10
+  ) => {
+    const allQuestions = getQuestionsByKnowledgePoint(knowledgePointId)
+    const total = allQuestions.length
+    const totalPages = Math.ceil(total / pageSize)
+    const startIndex = (page - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    const list = allQuestions.slice(startIndex, endIndex)
+
+    return {
+      list,
+      total,
+      totalPages,
+      currentPage: page,
+      pageSize
+    }
+  }
+
+  /**
    * 添加知识点
    */
   const addKnowledgePoint = (data: KnowledgePointFormData): void => {
@@ -298,6 +322,43 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
   }
 
   /**
+   * 获取章节详细信息列表（包含节数量和完整信息）
+   */
+  const getChapterDetailsById = (chapterId: string) => {
+    const chapter = chapterStore.chapters.find(c => c.id === chapterId)
+    if (!chapter) return null
+
+    const sections = chapterStore.getSectionsByChapter(chapterId).value
+    const sectionCount = sections.length
+
+    // 生成显示文本：章名称(节数量)
+    const displayText = sectionCount > 0
+      ? `${chapter.name}(${sectionCount}节)`
+      : chapter.name
+
+    // 截断到5个字符
+    const truncatedText = displayText.length > 5
+      ? displayText.substring(0, 5) + '...'
+      : displayText
+
+    // 生成悬停提示文本：章名称 + 所有小节列表
+    let tooltipText = chapter.name
+    if (sectionCount > 0) {
+      tooltipText += '\n' + sections.map(s => `└─ ${s.name}`).join('\n')
+    }
+
+    return {
+      chapterId: chapter.id,
+      chapterName: chapter.name,
+      sectionCount,
+      displayText: truncatedText,
+      fullText: displayText,
+      tooltipText,
+      sections
+    }
+  }
+
+  /**
    * 获取章节名称列表
    */
   const getChapterNamesByIds = (chapterIds: string[]): string[] => {
@@ -309,6 +370,45 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
         return chapter ? chapter.name : ''
       })
       .filter(name => name !== '')
+  }
+
+  /**
+   * 获取章节详细信息列表
+   */
+  const getChapterDetailsByIds = (chapterIds: string[]) => {
+    if (!chapterIds || chapterIds.length === 0) return []
+
+    return chapterIds
+      .map(id => getChapterDetailsById(id))
+      .filter(detail => detail !== null) as ReturnType<typeof getChapterDetailsById>[]
+  }
+
+  /**
+   * 获取纯章节名称列表（用于"章"列）
+   */
+  const getChapterNamesOnly = (chapterIds: string[]): string[] => {
+    if (!chapterIds || chapterIds.length === 0) return []
+
+    return chapterIds
+      .map(id => {
+        const chapter = chapterStore.chapters.find(c => c.id === id)
+        return chapter ? chapter.name : ''
+      })
+      .filter(name => name !== '')
+  }
+
+  /**
+   * 获取所有小节名称列表（用于"节"列）
+   */
+  const getAllSectionNames = (chapterIds: string[]): string[] => {
+    if (!chapterIds || chapterIds.length === 0) return []
+
+    const allSections: string[] = []
+    chapterIds.forEach(chapterId => {
+      const sections = chapterStore.getSectionsByChapter(chapterId).value
+      sections.forEach(section => allSections.push(section.name))
+    })
+    return allSections
   }
 
   /**
@@ -366,11 +466,15 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
     getKnowledgePointById,
     getQuestionCountByKnowledgePoint,
     getQuestionsByKnowledgePoint,
+    getPaginatedQuestionsByKnowledgePoint,
     addKnowledgePoint,
     updateKnowledgePoint,
     deleteKnowledgePoint,
     toggleKnowledgePointStatus,
     getChapterNamesByIds,
+    getChapterDetailsByIds,
+    getChapterNamesOnly,
+    getAllSectionNames,
     linkQuestionToKnowledgePoint,
     unlinkQuestionFromKnowledgePoint,
     getAvailableQuestionsForKnowledgePoint
