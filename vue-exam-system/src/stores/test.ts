@@ -36,7 +36,7 @@ export const useTestStore = defineStore('test', () => {
       totalScore: 100,
       passingScore: 60,
       duration: 90,
-      startTime: '2025-01-20 14:00',
+      startTime: '2025-01-20 14:00', 
       endTime: '2025-01-20 15:30',
       subjectId: 's1',
       projectId: 'p1',

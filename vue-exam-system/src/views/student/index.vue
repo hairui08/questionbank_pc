@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="student-page">
     <aside class="sidebar">
       <div class="brand-block">
@@ -107,7 +107,7 @@
           <template v-if="activePracticeKey === 'chapter'">
             <div class="chapter-tree">
               <article
-                v-for="chapter in chapterTree"
+                v-for="(chapter, idx) in chapterTree"
                 :key="chapter.id"
                 class="chapter-card"
               >
@@ -140,7 +140,7 @@
                       <button
                         v-if="chapter.done === 0"
                         class="btn btn-primary"
-                        @click="startExam()"
+                        @click="startExam(idx + 1, chapter.title)"
                       >做题</button>
                       <button
                         v-else-if="chapter.done < chapter.total"
@@ -178,7 +178,7 @@
                         <button
                           v-if="(sec.done || 0) === 0"
                           class="btn btn-primary"
-                          @click="startExam()"
+                          @click="startExam(idx + 1, sec.title)"
                         >做题</button>
                         <button
                           v-else-if="(sec.done || 0) < (sec.total || 0)"
@@ -921,6 +921,58 @@
         </template>
       </TabNavigation>
     </main>
+
+    <!-- 继续/重做对话框 -->
+    <BaseModal
+      :visible="showContinueDialog"
+      @update:visible="showContinueDialog = false"
+      title="发现未完成的答题记录"
+      :close-on-click-outside="false"
+      :show-footer="false"
+    >
+      <template #header>
+        <div class="modal-header-bar">
+          <h3>发现未完成的答题记录</h3>
+          <button class="dialog-close" @click="showContinueDialog = false">×</button>
+        </div>
+      </template>
+      <div class="continue-dialog">
+        <p class="dialog-message">
+          检测到您之前有未完成的答题记录，您希望如何继续？
+        </p>
+
+        <div class="dialog-actions">
+          <button class="dialog-btn secondary" @click="handleRestart">
+            重新做题
+          </button>
+          <button class="dialog-btn primary" @click="handleContinue">
+            继续答题
+          </button>
+        </div>
+      </div>
+    </BaseModal>
+
+    <BaseModal
+      :visible="showModeDialog"
+      @update:visible="showModeDialog = false"
+      title="选择答题模式"
+      :close-on-click-outside="false"
+      :show-footer="false"
+    >
+      <template #header>
+        <div class="modal-header-bar">
+          <h3>选择答题模式</h3>
+          <button class="dialog-close" @click="showModeDialog = false">×</button>
+        </div>
+      </template>
+      <div class="mode-dialog">
+        <p class="dialog-message">请选择进入考试模式或练习模式</p>
+        <div class="dialog-actions">
+          <button class="dialog-btn secondary" @click="chooseMode('practice')">练习模式</button>
+          <button class="dialog-btn primary" @click="chooseMode('exam')">考试模式</button>
+        </div>
+      </div>
+    </BaseModal>
   </div>
 </template>
 
@@ -929,6 +981,8 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import TabNavigation from '@/components/Tab/TabNavigation.vue'
 import Pagination from '@/components/Pagination/Pagination.vue'
+import BaseModal from '@/components/Modal/BaseModal.vue'
+import { useExamSessionStore } from '@/stores/examSession'
 
 type PracticeKey =
   | 'chapter'
@@ -947,6 +1001,7 @@ interface ProjectOption {
   id: string
   name: string
   subjects: SubjectOption[]
+  subjectSurface?: SubjectSurface
 }
 
 interface StatBlock {
@@ -1030,15 +1085,27 @@ function generatePapers(subjectId: string, subjectName: string, practiceKey: Pra
       break
 
     case 'realExam':
-      // 历年真题：[年份]年真题卷
-      const startYear = 2024
+      // 历年真题：2025年{科目名称}真题、2024年{科目名称}真题、2023年{科目名称}真题、2022年{科目名称}真题
+      const startYear = 2025
       for (let i = 0; i < count; i++) {
         const year = startYear - i
+        const total = 12
+        // 提高未完成占比：前3条显示部分已做，每隔4条插入部分已做
+        let done = 0
+        if (i === 0) {
+          done = total
+        } else if (i < 3 || i % 4 === 0) {
+          done = Math.max(1, Math.floor(Math.random() * Math.floor(total * 0.6)))
+        } else {
+          done = 0
+        }
+        const accuracy = done === 0 ? 0 : Math.floor(30 + Math.random() * 50)
+        const action = i === 0 ? '再做一次' : (done === 0 ? '开始做题' : (done < total ? '继续做题' : '重做'))
         papers.push({
           id: `${subjectId}-real-${year}`,
-          title: `${year} 年${subjectName}真题卷`,
-          subtitle: `正确率：0%已做/总题：0/12`,
-          action: i === 0 ? '再做一次' : '开始做题',
+          title: `${year}年${subjectName}真题`,
+          subtitle: `正确率：${accuracy}%已做/总题：${done}/${total}`,
+          action,
           canDownload: true,
           canReview: true
         })
@@ -1046,26 +1113,41 @@ function generatePapers(subjectId: string, subjectName: string, practiceKey: Pra
       break
 
     case 'sprint':
-      // 考前冲刺：考前冲刺模拟卷（第X套）
+      // 考前冲刺：模拟试卷（三）、模拟试卷（二）、模拟试卷（一）（倒序）
       for (let i = 0; i < count; i++) {
+        const total = 12
+        const setNo = count - i // 倒序编号
+        const done = (i % 4 === 0)
+          ? Math.floor(total * 0.4)
+          : Math.floor(Math.random() * Math.floor(total * 0.5))
+        const accuracy = done === 0 ? 0 : Math.floor(25 + Math.random() * 40)
+        const action = done === 0 ? '开始做题' : (done < total ? '继续做题' : '重做')
         papers.push({
-          id: `${subjectId}-sprint-${i + 1}`,
-          title: `考前冲刺模拟卷（第${i + 1}套）`,
-          subtitle: `正确率：0%已做/总题：0/12`,
-          action: '开始做题',
+          id: `${subjectId}-sprint-${setNo}`,
+          title: `模拟试卷（${setNo}）`,
+          subtitle: `正确率：${accuracy}%已做/总题：${done}/${total}`,
+          action,
           canDownload: true
         })
       }
       break
 
     case 'entrance':
-      // 入学测试：入学诊断测试（第X套）
+      // 入学测试：2025年入学测试、2024年入学测试、2023年入学测试
+      const entranceStartYear = 2025
       for (let i = 0; i < count; i++) {
+        const year = entranceStartYear - i
+        const total = 12
+        const done = (i % 5 === 1)
+          ? Math.floor(total * 0.3)
+          : Math.floor(Math.random() * Math.floor(total * 0.3))
+        const accuracy = done === 0 ? 0 : Math.floor(20 + Math.random() * 30)
+        const action = done === 0 ? '开始测试' : (done < total ? '继续测试' : '重测')
         papers.push({
-          id: `${subjectId}-entrance-${i + 1}`,
-          title: `入学诊断测试（第${i + 1}套）`,
-          subtitle: `正确率：0%已做/总题：0/12`,
-          action: '开始测试',
+          id: `${subjectId}-entrance-${year}`,
+          title: `${year}年入学测试`,
+          subtitle: `正确率：${accuracy}%已做/总题：${done}/${total}`,
+          action,
           canReview: true
         })
       }
@@ -1180,6 +1262,13 @@ const defaultResourceConfig: Record<PracticeKey, PracticeResources> = {
   entrance: { items: [] }
 }
 
+// 安全兜底的科目展示对象，避免未定义访问
+const DEFAULT_SUBJECT_SURFACE: SubjectSurface = {
+  stats: [] as StatBlock[],
+  practiceEntries: [] as PracticeEntry[],
+  resourceConfig: defaultResourceConfig
+}
+
 // 创建科目数据配置
 function createSubjectSurface(subjectId: string, hasData: boolean = false): SubjectSurface {
   return {
@@ -1231,19 +1320,23 @@ const subjectSurfaces: Record<string, SubjectSurface> = {
   'cpa-tax': createSubjectSurface('cpa-tax', true)
 }
 
-const activeProjectId = ref(projects[0].id)
-const activeSubjectId = ref(projects[0].subjects[0].id)
+const activeProjectId = ref<string>(projects?.[0]?.id ?? '')
+const activeSubjectId = ref<string>(projects?.[0]?.subjects?.[0]?.id ?? '')
 const activePracticeKey = ref<PracticeKey>('chapter')
 const statPreview = ref<StatBlock | null>(null)
 
 const activeProject = computed(() => {
-  return projects.find((project) => project.id === activeProjectId.value) ?? projects[0]
+  return projects?.find((project) => project.id === activeProjectId.value)
 })
 
-const subjectOptions = computed(() => activeProject.value.subjects)
+
+const subjectOptions = computed(() => activeProject.value?.subjects ?? [])
+
+// 默认对象：至少包含 practiceEntries，避免下游读取时报错
+
 
 const currentSurface = computed<SubjectSurface>(() => {
-  return subjectSurfaces[activeSubjectId.value] ?? subjectSurfaces.default
+  return subjectSurfaces[activeSubjectId.value] ?? DEFAULT_SUBJECT_SURFACE
 })
 
 const resourceItems = computed<ResourceItem[]>(() => {
@@ -1300,27 +1393,21 @@ watch(activeProjectId, () => {
 })
 
 watch(activeSubjectId, () => {
-  syncPracticeState()
+  initPracticeFromSurface()
 })
 
 watch(currentSurface, () => {
-  syncPracticeState()
+  initPracticeFromSurface()
 })
 
-function syncPracticeState() {
+function initPracticeFromSurface() {
+  // currentSurface 始终返回 SubjectSurface，这里直接使用即可
   const surface = currentSurface.value
-  if (surface.practiceEntries.length) {
-    activePracticeKey.value = surface.practiceEntries[0].key
-  } else {
-    activePracticeKey.value = 'chapter'
-  }
+  // 安全读取第一个 entry 的 key，默认回落到 'chapter'
+  activePracticeKey.value = (surface.practiceEntries?.[0]?.key ?? 'chapter') as PracticeKey
   statPreview.value = null
 }
 
-function selectProject(projectId: string) {
-  if (projectId === activeProjectId.value) return
-  activeProjectId.value = projectId
-}
 
 function handleProjectChange() {
   // v-model已经更新了activeProjectId，这里只需要触发后续逻辑
@@ -1363,28 +1450,116 @@ function activatePractice(key: PracticeKey) {
 // 路由实例
 const router = useRouter()
 
-// 处理开始答题
-function handleStartExam(item: ResourceItem) {
-  // 跳转到答题页面
-  router.push({
-    name: 'StudentExam',
-    params: { id: item.id }
-  })
+// examSession store
+const examSessionStore = useExamSessionStore()
+
+// 对话框状态
+const showContinueDialog = ref(false)
+const pendingExamPath = ref<string | { path: string; query?: Record<string, string> }>('')
+const showModeDialog = ref(false)
+const nextPracticePath = ref<{ path: string; query?: Record<string, string> } | null>(null)
+const nextExamPath = ref<{ path: string; query?: Record<string, string> } | null>(null)
+
+// 统一构造目标路径（按项目ID与练习类型 + 序号/年份）
+function buildPracticePathByKey(projectId: string, key: PracticeKey, meta?: { chapterNo?: number; year?: number; setNo?: number }, mode: 'practice' | 'exam' = 'exam') {
+  const base = mode === 'exam' ? `/student/exam/${projectId}` : `/student/practice/${projectId}`
+  switch (key) {
+    case 'chapter':
+      return `${base}-ch-${meta?.chapterNo ?? 1}`
+    case 'realExam':
+      return `${base}-real-${meta?.year ?? 2024}`
+    case 'sprint':
+      return `${base}-sprint-${meta?.setNo ?? 1}`
+    case 'entrance':
+      return `${base}-entrance-${meta?.setNo ?? 1}`
+    default:
+      return `${base}-entrance-${meta?.setNo ?? 1}`
+  }
 }
 
-// 统一入口：开始做题（章节或小节）
-// 无需参数，后续可扩展为接受试卷ID或标题
-const startExam = () => {
-  router.push('/student/exam/senior-acc-practice-real-2024')
+// 从文案中提取年份（优先 title，其次 subtitle）
+function extractYear(...texts: Array<string | undefined>) {
+  for (const t of texts) {
+    const m = t?.match(/((?:19|20)\d{2})/)
+    if (m) return Number(m[1])
+  }
+  return undefined
+}
+
+// 从文案中提取“第n套”的 n（优先 title，其次 subtitle）
+function extractSetNo(...texts: Array<string | undefined>) {
+  for (const t of texts) {
+    const m = t?.match(/第\s*(\d+)\s*套/)
+    if (m) return Number(m[1])
+  }
+  return undefined
+}
+
+// 根据章节标题在章节树中定位序号（找不到则默认1）
+function getChapterNoByTitle(title: string) {
+  const idx = chapterTree.value.findIndex(ch => ch.title === title)
+  return idx >= 0 ? idx + 1 : 1
+}
+
+// 处理开始答题（非章节练习资源项）：解析年份/套数
+function handleStartExam(item: ResourceItem) {
+  const key = activePracticeKey.value
+  const projectId = activeProjectId.value
+
+  const year = key === 'realExam' ? extractYear(item.title, item.subtitle) : undefined
+  const setNo = (key === 'sprint' || key === 'entrance') ? extractSetNo(item.title, item.subtitle) : undefined
+
+  const examPath = buildPracticePathByKey(projectId, key, { year, setNo }, 'exam')
+  const practicePath = buildPracticePathByKey(projectId, key, { year, setNo }, 'practice')
+
+  const isContinue = /继续/.test(item.action)
+  const isStart = /开始/.test(item.action)
+
+  if (isContinue) {
+    const mode = examSessionStore.currentSession?.settings.mode || 'exam'
+    pendingExamPath.value = { path: mode === 'exam' ? examPath : practicePath, query: { title: item.title, type: key } }
+    showContinueDialog.value = true
+    return
+  }
+
+  if (isStart) {
+    nextPracticePath.value = { path: practicePath, query: { title: item.title, type: key } }
+    nextExamPath.value = { path: examPath, query: { title: item.title, type: key } }
+    showModeDialog.value = true
+    return
+  }
+
+  router.push({ path: examPath, query: { title: item.title, type: key } })
+}
+
+// 处理开始答题（章节练习）：使用章节序号
+function startExam(chapterNo?: number, title?: string) {
+  const path = buildPracticePathByKey(activeProjectId.value, 'chapter', { chapterNo }, 'practice')
+  const idx = Number(chapterNo || 1) - 1
+  const resolvedTitle = title || chapterTree.value[idx]?.title || ''
+  const order = chapterTree.value[idx]?.order || `第${Number(chapterNo || 1)}章`
+
+  if (examSessionStore.hasUnfinishedSession) {
+    pendingExamPath.value = { path, query: { title: resolvedTitle, order } }
+    showContinueDialog.value = true
+  } else {
+    router.push({ path, query: { title: resolvedTitle, order } })
+  }
 }
 
 // 章节练习树相关逻辑
 interface ChapterSection { id: string; title: string }
+type ChapterSectionView = ChapterSection & {
+  accuracy?: number
+  done?: number
+  total?: number
+}
+
 interface ChapterNode {
   id: string
   order: string
   title: string
-  sections: ChapterSection[]
+  sections: ChapterSectionView[]
   total: number
   done: number
   accuracy: number
@@ -1409,12 +1584,37 @@ function selectChapterNode(node: { title?: string }) {
 
 function redoByChapter(title: string) {
   activeChapterTitle.value = title
-  // 在此处可以接入答题页面路由跳转
+  const chapterNo = getChapterNoByTitle(title)
+  const path = buildPracticePathByKey(activeProjectId.value, 'chapter', { chapterNo }, 'practice')
+  const order = `第${chapterNo}章`
+
+  if (examSessionStore.hasUnfinishedSession) {
+    pendingExamPath.value = { path, query: { title, order } }
+    showContinueDialog.value = true
+  } else {
+    router.push({ path, query: { title, order } })
+  }
 }
 
-function analysisByChapter(title: string) {
-  activeChapterTitle.value = title
-  // 在此处可以接入解析页面路由跳转
+
+// 对话框处理函数：继续答题
+function handleContinue() {
+  showContinueDialog.value = false
+  router.push(pendingExamPath.value as any)
+}
+
+// 对话框处理函数：重新做题
+function handleRestart() {
+  examSessionStore.resetExam()
+  showContinueDialog.value = false
+  router.push(pendingExamPath.value as any)
+}
+
+function chooseMode(mode: 'practice' | 'exam') {
+  showModeDialog.value = false
+  const target = mode === 'exam' ? nextExamPath.value : nextPracticePath.value
+  if (!target) return
+  router.push(target as any)
 }
 
 // 将章节练习的 ResourceItem 转换为树形章节结构
@@ -1427,10 +1627,10 @@ const chapterTree = computed<ChapterNode[]>(() => {
       .replace(/^第\d+章\s*·\s*/, '')
       .replace(/专项练习$/, '') || item.title
 
-    const sections: ChapterSection[] = [
-      { id: `${item.id}-sec-1`, title: '第一节 社会工作的内涵' },
-      { id: `${item.id}-sec-2`, title: '第二节 社会工作的基本原则' },
-      { id: `${item.id}-sec-3`, title: '第三节 社会工作的主要领域' }
+    const sections: ChapterSectionView[] = [
+      { id: `${item.id}-sec-1`, title: '第一节 社会工作的内涵', accuracy: 0, done: 0, total: 0 },
+      { id: `${item.id}-sec-2`, title: '第二节 社会工作的基本原则', accuracy: 0, done: 0, total: 0 },
+      { id: `${item.id}-sec-3`, title: '第三节 社会工作的主要领域', accuracy: 0, done: 0, total: 0 }
     ]
 
     // 从生成试卷时的 totalQuestions 构造统计（示例：正确率=0、已做=0）
@@ -1456,7 +1656,7 @@ watch([activeSubjectId, activePracticeKey], () => {
   activeChapterTitle.value = ''
 })
 
-syncPracticeState()
+initPracticeFromSurface()
 </script>
 
 <style scoped>
@@ -1632,7 +1832,7 @@ syncPracticeState()
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 22px;
+  padding: 22px 0;
 }
 
 .main-header {
@@ -2415,7 +2615,7 @@ syncPracticeState()
 .chapter-tree {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .chapter-card {
@@ -2423,7 +2623,7 @@ syncPracticeState()
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
   background: #fff;
-  padding: 12px 16px;
+  padding: 6px 4px;
 }
 
 .chapter-main {
@@ -2458,16 +2658,16 @@ syncPracticeState()
   transition: all 0.2s ease;
 }
 .chapter-toggle-icon::before {
-  left: 2px;
-  right: 2px;
-  top: 6px;
+  width: 12px;
   height: 2px;
+  top: 9px;
+  left: 3px;
 }
 .chapter-toggle-icon::after {
-  top: 2px;
-  bottom: 2px;
-  left: 6px;
   width: 2px;
+  height: 12px;
+  top: 4px;
+  left: 8px;
 }
 .chapter-toggle-icon.expanded::after {
   opacity: 0;
@@ -2736,8 +2936,6 @@ syncPracticeState()
 .chapter-toggle-icon::after {
   content: ''; position: absolute; background: #ff7a00;
 }
-.chapter-toggle-icon::before { width: 12px; height: 2px; top: 9px; left: 4px; }
-.chapter-toggle-icon::after { width: 2px; height: 12px; top: 4px; left: 9px; }
 .chapter-toggle-icon.expanded::after { display: none; }
 
 /* 分页样式 */
@@ -2784,6 +2982,68 @@ syncPracticeState()
   color: #ff4d4f;
   font-weight: 600;
 }
+
+/* 继续/重做对话框样式 */
+.continue-dialog {
+  padding: 20px 0;
+}
+
+.dialog-message {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #333;
+  margin: 0 0 24px 0;
+  text-align: center;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.dialog-btn {
+  min-width: 120px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dialog-btn.primary {
+  border: none;
+  background: linear-gradient(135deg, #ff7b50 0%, #ff4d3a 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(255, 94, 66, 0.25);
+}
+
+.dialog-btn.primary:hover {
+  background: linear-gradient(135deg, #ff5722 0%, #e64a19 100%);
+  box-shadow: 0 10px 20px rgba(255, 87, 34, 0.35);
+  transform: translateY(-1px);
+}
+
+.dialog-btn.secondary {
+  border: 1px solid #e0e0e0;
+  background: #ffffff;
+  color: #666;
+}
+
+.dialog-btn.secondary:hover {
+  border-color: var(--brand-primary, #ff6f3c);
+  background: rgba(255, 111, 60, 0.03);
+  color: var(--brand-primary, #ff6f3c);
+}
+
+.mode-dialog{
+  padding: 20px 0;
+}
+
+.modal-header-bar{ display:flex; align-items:center; justify-content:space-between; }
+.dialog-close{ background:transparent; border:none; font-size:20px; line-height:1; color:#999; cursor:pointer; padding:4px 8px; border-radius:6px; }
+.dialog-close:hover{ background:#f4f5f7; color:#666; }
 </style>
 
 

@@ -49,16 +49,11 @@
               {{ exam.status === 'active' ? '启用' : '禁用' }}
             </span>
           </td>
-          <td class="actions">
-            <button class="action-btn preview" @click="emit('preview', exam.id)" title="预览">
-              👁️
-            </button>
-            <button class="action-btn edit" @click="emit('edit', exam.id)" title="编辑">
-              ✏️
-            </button>
-            <button class="action-btn delete" @click="emit('delete', exam.id)" title="删除">
-              🗑️
-            </button>
+          <td>
+            <ActionDropdown
+              :items="getMenuItems(exam)"
+              @select="(key) => handleActionSelect(key, exam.id)"
+            />
           </td>
         </tr>
       </tbody>
@@ -69,6 +64,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useLearningStageStore } from '@/stores/learningStage'
+import ActionDropdown from '@/components/ActionDropdown.vue'
+import type { MenuItem } from '@/components/ActionDropdown.vue'
 import type { Exam } from '../types'
 
 interface Props {
@@ -141,6 +138,34 @@ function getStageName(stageId?: string): string {
   if (!stageId) return '-'
   const stage = learningStageStore.learningStages.find(s => s.id === stageId)
   return stage?.name || '-'
+}
+
+/**
+ * 获取操作菜单项
+ */
+function getMenuItems(exam: Exam): MenuItem[] {
+  return [
+    { key: 'preview', label: '预览', icon: '👁️' },
+    { key: 'edit', label: '编辑', icon: '✏️' },
+    { key: 'delete', label: '删除', icon: '🗑️', danger: true }
+  ]
+}
+
+/**
+ * 处理操作选择
+ */
+function handleActionSelect(key: string, examId: string) {
+  switch (key) {
+    case 'preview':
+      emit('preview', examId)
+      break
+    case 'edit':
+      emit('edit', examId)
+      break
+    case 'delete':
+      emit('delete', examId)
+      break
+  }
 }
 </script>
 
@@ -234,30 +259,6 @@ function getStageName(stageId?: string): string {
 .payment-badge.payment-premium {
   background: #fff8e1;
   color: #f57f17;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  padding: 6px 10px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s ease;
-}
-
-.action-btn:hover {
-  background: rgba(0, 102, 204, 0.1);
-  transform: scale(1.1);
-}
-
-.action-btn.delete:hover {
-  background: rgba(239, 83, 80, 0.1);
 }
 
 .empty-state {

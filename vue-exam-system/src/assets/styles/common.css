@@ -70,6 +70,10 @@
   font-size: 12px;
 }
 
+.form{
+  padding: 10px 20px;
+}
+
 /* 表单组件 */
 .form-group {
   display: grid;
@@ -88,6 +92,37 @@
   border-radius: 6px;
   border: 1px solid #cdd5e0;
   font-size: 14px;
+  transition: all 0.2s ease;
+  background-color: #ffffff;
+}
+
+.form-group input:hover:not([readonly]):not(:disabled),
+.form-group select:hover:not(:disabled),
+.form-group textarea:hover:not(:disabled) {
+  border-color: #4f77ff;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #4f77ff;
+  box-shadow: 0 0 0 3px rgba(79, 119, 255, 0.1);
+}
+
+.form-group input[readonly] {
+  background-color: #f5f7fa;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled {
+  background-color: #f5f7fa;
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .form-group textarea {
@@ -116,4 +151,74 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+/* ========== 通用徽章样式 ========== */
+
+/* 基础徽章样式 */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+/* 频次徽章颜色 */
+.badge-frequency-low {
+  background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+  color: #0d4d3f;
+  box-shadow: 0 2px 4px rgba(132, 250, 176, 0.3);
+}
+
+.badge-frequency-medium {
+  background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+  color: #5a3e06;
+  box-shadow: 0 2px 4px rgba(255, 234, 167, 0.4);
+}
+
+.badge-frequency-high {
+  background: linear-gradient(135deg, #ff7675 0%, #d63031 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(255, 118, 117, 0.4);
+}
+
+/* 统一输入框样式类 */
+.form-input {
+  padding: 8px 12px;
+  border: 1px solid #cdd5e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.form-input:hover:not(:disabled) {
+  border-color: #a8b3c1;
+}
+
+.form-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+  outline: none;
+}
+
+.form-input:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 必填标记样式 */
+.required {
+  color: #e74c3c;
+  margin-left: 2px;
+}
+
+/* 表单提示文字 */
+.form-hint {
+  font-size: 12px;
+  color: var(--secondary-text);
+  margin-top: 4px;
 }

@@ -120,6 +120,6 @@ if (savedTab && props.tabs.some(t => t.key === savedTab)) {
   border: 1px solid var(--panel-border);
   border-top: none;
   min-height: 600px;
-  padding: 0 22px;
+  padding: 28px;
 }
 </style>

@@ -44,16 +44,6 @@
       </div>
 
       <div class="form-group">
-        <label for="description">题型描述</label>
-        <textarea
-          id="description"
-          v-model="formData.description"
-          placeholder="简要描述题型特点（0-200字符）"
-          maxlength="200"
-        ></textarea>
-      </div>
-
-      <div class="form-group">
         <label for="order">排序 <span class="required">*</span></label>
         <input
           id="order"
@@ -112,7 +102,6 @@ const formData = reactive({
   projectName: '',
   internalName: '',
   displayName: '',
-  description: '',
   order: 1,
   status: 'active' as 'active' | 'disabled'
 })
@@ -134,7 +123,6 @@ watch(
       formData.projectName = props.type.projectName
       formData.internalName = props.type.internalName
       formData.displayName = props.type.displayName
-      formData.description = props.type.description
       formData.order = props.type.order
       formData.status = props.type.status
       errors.displayName = ''
@@ -183,7 +171,6 @@ const handleSubmit = () => {
 
   emit('submit', props.type.id, {
     displayName: formData.displayName.trim(),
-    description: formData.description.trim(),
     order: formData.order,
     status: formData.status
   })

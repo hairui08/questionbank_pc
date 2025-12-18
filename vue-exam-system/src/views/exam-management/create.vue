@@ -7,11 +7,11 @@
           ← 返回列表
         </button>
         <div class="top-actions">
-          <button class="btn accent" @click="handleRandomSelect">
+          <button class="btn secondary" @click="handleRandomSelect">
             🎲 随机组卷
           </button>
           <button
-            class="btn info"
+            class="btn secondary"
             :disabled="!canPreview"
             @click="handlePreview"
           >
@@ -41,7 +41,6 @@
             :active-question-id="activeQuestionId"
             @scroll-to-type="scrollToType"
             @scroll-to-question="scrollToQuestion"
-            @batch-update-score="handleBatchUpdateScore"
             @move-type-up="handleMoveTypeUp"
             @move-type-down="handleMoveTypeDown"
           />
@@ -333,21 +332,6 @@ function handleMoveDown(questionId: string) {
   }
 }
 
-// 批量更新某一题型的分值
-function handleBatchUpdateScore(type: string, score: number) {
-  let updatedCount = 0
-  examForm.value.questions.forEach(question => {
-    if (question.type === type) {
-      question.score = score
-      updatedCount++
-    }
-  })
-
-  if (updatedCount > 0) {
-    showToast(`成功设置 ${updatedCount} 道${getTypeName(type)}的分值为 ${score} 分`, { type: 'success' })
-  }
-}
-
 // 题型上移
 function handleMoveTypeUp(type: string) {
   // 找出该题型的所有试题
@@ -415,8 +399,12 @@ function getTypeName(type: string): string {
 
 // 创建试题
 function handleCreateQuestion() {
+  if (!examForm.value.projectId) {
+    showToast('请先选择试卷的项目信息', { type: 'error' })
+    return
+  }
   if (!examForm.value.subjectId) {
-    showToast('请先填写试卷的科目信息', { type: 'error' })
+    showToast('请先选择试卷的科目信息', { type: 'error' })
     return
   }
   showCreateDrawer.value = true
@@ -557,6 +545,7 @@ function handleBack() {
 .top-actions {
   display: flex;
   gap: 12px;
+  align-items: center;
 }
 
 .content-grid {
@@ -611,29 +600,7 @@ function handleBack() {
   background: rgba(0, 102, 204, 0.08);
 }
 
-.btn.accent {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
-  color: #ffffff;
-  border-color: #ff6b6b;
-  box-shadow: 0 2px 6px rgba(255, 107, 107, 0.3);
-}
-
-.btn.accent:hover {
-  background: linear-gradient(135deg, #ff5252 0%, #ff7043 100%);
-}
-
-.btn.info {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #ffffff;
-  border-color: #667eea;
-  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
-}
-
-.btn.info:hover:not(:disabled) {
-  background: linear-gradient(135deg, #5568d3 0%, #6a3f91 100%);
-}
-
-.btn.info:disabled {
+.btn.secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

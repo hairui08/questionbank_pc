@@ -5,19 +5,20 @@
       <template #prototype>
         <div class="tab-panel">
           <div class="prototype-wrapper">
-            <SubjectTree :active-subject-id="activeSubject?.id" @subject-change="handleSubjectChange" />
-
-            <TypeTable
-              v-if="activeSubject"
-              :types="currentTypes"
-              :project-name="activeSubject.projectName"
-              :subject-name="activeSubject.name"
-              @add-type="openAddTypeModal"
-              @edit-type="openEditTypeModal"
-              @delete-type="openDeleteTypeModal"
-              @toggle-status="handleToggleStatus"
-            />
-          </div>
+          <SubjectTree 
+            :active-subject-id="currentSubjectId"
+            @subject-change="handleSubjectChange"
+          />
+          <TypeTable
+            :types="currentTypes"
+            @add-type="openAddTypeModal"
+            @edit-type="openEditTypeModal"
+            @delete-type="openDeleteTypeModal"
+            @toggle-status="openToggleStatusModal"
+            @move-up="handleMoveUp"
+            @move-down="handleMoveDown"
+          />
+        </div>
         </div>
       </template>
 
@@ -84,23 +85,28 @@
                   </tr>
                   <tr>
                     <td>题型列表展示</td>
-                    <td>以表格形式展示选中科目的所有题型，包含内部名称、外部名称、描述、排序、状态等信息</td>
+                    <td>以表格形式展示选中科目的所有题型，包含内部名称、外部名称、排序、排序操作、状态等信息</td>
                     <td>• 按排序号升序排列<br>• 支持分页浏览（每页10条）<br>• 实时反映启用/禁用状态</td>
                   </tr>
                   <tr>
                     <td>新增题型</td>
                     <td>点击"新增题型"按钮打开弹窗，填写题型信息后提交，系统自动进行唯一性校验</td>
-                    <td>• 内部名称限20字符，仅支持英文、数字、下划线<br>• 外部名称限50字符<br>• 描述信息限200字符<br>• 排序号自动递增，支持手动调整</td>
+                    <td>• 内部名称限20字符，仅支持英文、数字、下划线<br>• 外部名称限50字符<br>• 排序号自动递增，支持手动调整</td>
                   </tr>
                   <tr>
                     <td>编辑题型</td>
                     <td>点击题型行的"编辑"按钮，在弹窗中修改题型信息并保存</td>
-                    <td>• 内部名称不可修改<br>• 外部名称、描述、排序号可修改<br>• 修改后的外部名称和排序号仍需满足唯一性</td>
+                    <td>• 内部名称不可修改<br>• 外部名称、排序号可修改<br>• 修改后的外部名称和排序号仍需满足唯一性</td>
                   </tr>
                   <tr>
                     <td>删除题型</td>
                     <td>点击题型行的"删除"按钮，弹出二次确认弹窗，确认后执行删除操作</td>
                     <td>• 删除前检查是否有试题引用该题型<br>• 若有引用则禁止删除并提示<br>• 删除操作不可撤销</td>
+                  </tr>
+                  <tr>
+                    <td>题型排序调整</td>
+                    <td>通过上移/下移按钮调整题型在列表中的显示顺序</td>
+                    <td>• 点击↑按钮上移题型（与上一个交换顺序）<br>• 点击↓按钮下移题型（与下一个交换顺序）<br>• 第一个题型的上移按钮自动禁用<br>• 最后一个题型的下移按钮自动禁用</td>
                   </tr>
                   <tr>
                     <td>内部名称唯一性校验</td>
@@ -154,12 +160,6 @@
                     <td>• 长度1-50字符<br>• 科目级唯一（大小写不敏感）<br>• 去除前后空格后校验<br>• 支持中文、英文、数字、常见符号</td>
                   </tr>
                   <tr>
-                    <td>描述信息</td>
-                    <td>文本</td>
-                    <td>否</td>
-                    <td>• 长度0-200字符<br>• 用于说明题型的用途或特点<br>• 支持多行文本</td>
-                  </tr>
-                  <tr>
                     <td>排序号</td>
                     <td>整数</td>
                     <td>是</td>
@@ -189,14 +189,14 @@
                       <td>
                         <strong>Given</strong> 用户已进入题型管理页面<br>
                         <strong>When</strong> 用户点击左侧科目树中的某个科目<br>
-                        <strong>Then</strong> 右侧应展示该科目配置的所有题型，按排序号升序排列，并显示内部名称、外部名称、描述、排序、状态等信息
+                        <strong>Then</strong> 右侧应展示该科目配置的所有题型，按排序号升序排列，并显示内部名称、外部名称、排序、状态等信息
                       </td>
                     </tr>
                     <tr>
                       <td>AC-02</td>
                       <td>
                         <strong>Given</strong> 用户已选中科目A<br>
-                        <strong>When</strong> 用户点击"新增题型"按钮，填写内部名称"single"、外部名称"单项选择题"、描述"每题只有一个正确答案"、排序号1，然后提交<br>
+                        <strong>When</strong> 用户点击"新增题型"按钮，填写内部名称"single"、外部名称"单项选择题"、排序号1，然后提交<br>
                         <strong>Then</strong> 系统应成功保存题型，并在题型列表中显示新增的题型，同时弹出成功提示
                       </td>
                     </tr>
@@ -244,7 +244,7 @@
                       <td>AC-08</td>
                       <td>
                         <strong>Given</strong> 科目A下存在题型T1<br>
-                        <strong>When</strong> 用户点击"编辑"按钮，修改外部名称和描述，然后提交<br>
+                        <strong>When</strong> 用户点击"编辑"按钮，修改外部名称，然后提交<br>
                         <strong>Then</strong> 系统应成功更新题型信息，Toast提示"题型编辑成功"，内部名称保持不变
                       </td>
                     </tr>
@@ -280,6 +280,22 @@
                         <strong>Then</strong> 右侧表格显示空状态，提示"暂无题型配置"，引导用户点击【新增题型】按钮
                       </td>
                     </tr>
+                    <tr>
+                      <td>AC-13</td>
+                      <td>
+                        <strong>Given</strong> 科目A下存在3个题型，排序分别为1、2、3<br>
+                        <strong>When</strong> 用户点击排序为2的题型的上移按钮<br>
+                        <strong>Then</strong> 该题型应与排序为1的题型交换位置，列表顺序更新，Toast提示"题型上移成功"
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>AC-14</td>
+                      <td>
+                        <strong>Given</strong> 科目A下某题型是该科目的第一个题型<br>
+                        <strong>When</strong> 用户查看该题型的排序操作列<br>
+                        <strong>Then</strong> 上移按钮应显示为禁用状态，下移按钮正常可用
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -301,12 +317,7 @@
 
     <!-- 弹窗组件 -->
     <AddTypeModal
-      v-if="activeSubject"
       :visible="addTypeModalVisible"
-      :subject-id="activeSubject.id"
-      :subject-name="activeSubject.name"
-      :project-id="activeSubject.projectId"
-      :project-name="activeSubject.projectName"
       :default-order="getNextTypeOrder()"
       @update:visible="addTypeModalVisible = $event"
       @submit="handleAddType"
@@ -324,6 +335,7 @@
       :title="deleteModalTitle"
       :message="deleteModalMessage"
       :error-message="deleteModalError"
+      :confirm-button-text="deleteModalButtonText"
       @update:visible="deleteModalVisible = $event"
       @confirm="handleDeleteConfirm"
     />
@@ -339,17 +351,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useQuestionTypeStore } from '@/stores/questionType'
 import { useToast } from '@/composables/useToast'
 import AppLayout from '@/components/Layout/AppLayout.vue'
 import TabNavigation from '@/components/Tab/TabNavigation.vue'
 import Toast from '@/components/Feedback/Toast.vue'
-import SubjectTree from './components/SubjectTree.vue'
 import TypeTable from './components/TypeTable.vue'
 import AddTypeModal from './components/AddTypeModal.vue'
 import EditTypeModal from './components/EditTypeModal.vue'
-import DeleteConfirmModal from '@/views/chapter-management/components/DeleteConfirmModal.vue'
+import SubjectTree from './components/SubjectTree.vue'
+import DeleteConfirmModal from '@/views/category-management/components/DeleteConfirmModal.vue'
 import type {
   QuestionType,
   QuestionTypeFormData,
@@ -366,9 +378,6 @@ const tabs = [
   { key: 'style-guide', label: '样式指南', icon: '🎯' }
 ]
 
-// 当前选中的科目
-const activeSubject = ref<SubjectTreeNode | null>(null)
-
 // 弹窗控制
 const addTypeModalVisible = ref(false)
 const editTypeModalVisible = ref(false)
@@ -381,39 +390,27 @@ const editingType = ref<QuestionType | null>(null)
 const deleteModalTitle = ref('')
 const deleteModalMessage = ref('')
 const deleteModalError = ref('')
+const deleteModalButtonText = ref('确认删除')
 const deletingType = ref<QuestionType | null>(null)
+const confirmActionType = ref<'delete' | 'disable'>('delete')
+
+// 当前选中的科目ID
+const currentSubjectId = ref('s1') // 默认选中第一个科目
 
 /**
- * 当前科目的题型列表
+ * 所有题型列表，根据选中科目过滤
  */
 const currentTypes = computed(() => {
-  if (!activeSubject.value) return []
-  return questionTypeStore.getQuestionTypesBySubject(activeSubject.value.id).value
+  const types = questionTypeStore.getAllQuestionTypes.filter(type => type.subjectId === currentSubjectId.value)
+  console.log('当前选中科目ID:', currentSubjectId.value, '过滤后的题型数量:', types.length)
+  return types
 })
-
-/**
- * 初始化：选中第一个科目
- */
-onMounted(() => {
-  const firstProject = questionTypeStore.projectTree[0]
-  if (firstProject && firstProject.subjects.length > 0) {
-    activeSubject.value = firstProject.subjects[0]
-  }
-})
-
-/**
- * 科目切换事件
- */
-const handleSubjectChange = (subject: SubjectTreeNode) => {
-  activeSubject.value = subject
-}
 
 /**
  * 获取下一个题型排序号
  */
 const getNextTypeOrder = (): number => {
-  if (!activeSubject.value) return 1
-  const types = questionTypeStore.getQuestionTypesBySubject(activeSubject.value.id).value
+  const types = currentTypes.value
   return types.length > 0 ? Math.max(...types.map((t) => t.order)) + 1 : 1
 }
 
@@ -429,7 +426,10 @@ const openAddTypeModal = () => {
  */
 const handleAddType = (data: QuestionTypeFormData) => {
   try {
-    questionTypeStore.addQuestionType(data)
+    questionTypeStore.addQuestionType({
+      ...data,
+      subjectId: currentSubjectId.value
+    })
     showToast('题型添加成功', { type: 'success' })
   } catch (error) {
     showToast((error as Error).message, { type: 'error' })
@@ -460,22 +460,29 @@ const handleEditType = (typeId: string, updates: Partial<QuestionTypeFormData>) 
  * 打开删除题型确认弹窗
  */
 const openDeleteTypeModal = (type: QuestionType) => {
+  confirmActionType.value = 'delete'
   deletingType.value = type
   deleteModalTitle.value = '确认删除题型'
-  deleteModalMessage.value = `确定要删除题型"${type.displayName}"吗？删除后无法恢复。`
+  deleteModalMessage.value = `确定要删除题型"${type.displayName}"吗？`
+  deleteModalButtonText.value = '确认删除'
   deleteModalError.value = ''
   deleteModalVisible.value = true
 }
 
 /**
- * 处理删除确认
+ * 处理删除/禁用确认
  */
 const handleDeleteConfirm = () => {
   if (!deletingType.value) return
 
   try {
-    questionTypeStore.deleteQuestionType(deletingType.value.id)
-    showToast('题型删除成功', { type: 'success' })
+    if (confirmActionType.value === 'delete') {
+      questionTypeStore.deleteQuestionType(deletingType.value.id)
+      showToast('题型删除成功', { type: 'success' })
+    } else {
+      // confirmActionType === 'disable'
+      toggleTypeStatus(deletingType.value)
+    }
     deleteModalVisible.value = false
   } catch (error) {
     deleteModalError.value = (error as Error).message
@@ -483,22 +490,77 @@ const handleDeleteConfirm = () => {
 }
 
 /**
- * 切换题型状态
+ * 切换题型状态（内部函数）
  */
-const handleToggleStatus = (type: QuestionType) => {
+const toggleTypeStatus = (type: QuestionType) => {
   try {
     questionTypeStore.toggleQuestionTypeStatus(type.id)
-    const newStatus = type.status === 'active' ? '禁用' : '启用'
-    showToast(`题型已${newStatus}`, { type: 'success' })
+    const message = type.status === 'active' ? '题型已禁用' : '题型已启用'
+    showToast(message, { type: 'success' })
   } catch (error) {
     showToast((error as Error).message, { type: 'error' })
   }
+}
+
+/**
+ * 打开启用/禁用确认弹窗
+ */
+const openToggleStatusModal = (type: QuestionType) => {
+  confirmActionType.value = 'disable'
+  deletingType.value = type
+
+  if (type.status === 'disabled') {
+    // 启用操作
+    deleteModalTitle.value = '确认启用题型'
+    deleteModalMessage.value = `确定要启用题型"${type.displayName}"吗？`
+    deleteModalButtonText.value = '确认启用'
+  } else {
+    // 禁用操作
+    deleteModalTitle.value = '确认禁用题型'
+    deleteModalMessage.value = `确定要禁用题型"${type.displayName}"吗？`
+    deleteModalButtonText.value = '确认禁用'
+  }
+
+  deleteModalError.value = ''
+  deleteModalVisible.value = true
+}
+
+/**
+ * 处理上移题型
+ */
+const handleMoveUp = (type: QuestionType) => {
+  try {
+    questionTypeStore.moveUp(type.id)
+    showToast('题型上移成功', { type: 'success' })
+  } catch (error) {
+    showToast((error as Error).message, { type: 'error' })
+  }
+}
+
+/**
+ * 处理下移题型
+ */
+const handleMoveDown = (type: QuestionType) => {
+  try {
+    questionTypeStore.moveDown(type.id)
+    showToast('题型下移成功', { type: 'success' })
+  } catch (error) {
+    showToast((error as Error).message, { type: 'error' })
+  }
+}
+
+/**
+ * 处理科目切换
+ */
+const handleSubjectChange = (subject: SubjectTreeNode) => {
+  console.log('handleSubjectChange被调用:', subject)
+  currentSubjectId.value = subject.id
+  console.log('切换科目:', subject.name, '当前科目ID:', subject.id)
 }
 </script>
 
 <style scoped>
 .tab-panel {
-  padding: 32px;
   animation: fade-in 0.3s ease;
 }
 
@@ -515,7 +577,7 @@ const handleToggleStatus = (type: QuestionType) => {
 
 .prototype-wrapper {
   display: flex;
-  gap: 24px;
+  gap: 16px;
 }
 
 .requirements-header {

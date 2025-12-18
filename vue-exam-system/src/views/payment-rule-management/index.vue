@@ -1147,7 +1147,6 @@ function handleToggleStatusConfirm() {
 
 <style scoped>
 .tab-panel {
-  padding: 24px;
   background-color: var(--panel-bg);
   min-height: calc(100vh - 120px);
 }

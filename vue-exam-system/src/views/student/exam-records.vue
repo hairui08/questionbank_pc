@@ -629,7 +629,17 @@ function formatDate(timestamp: number): string {
 }
 
 function viewRecordDetail(recordId: string) {
-  router.push('/student/exam/senior-acc-practice-real-2024')
+  const record = filteredRecords.value.find(r => r.id === recordId)
+
+  if (!record) {
+    console.error('未找到答题记录:', recordId)
+    return
+  }
+
+  router.push({
+    name: record.examType === 'chapter' ? 'StudentPracticeAnalysis' : 'StudentExamAnalysis',
+    params: { id: record?.examId ?? '' }
+  })
 }
 
 // 返回我的题库
@@ -637,9 +647,10 @@ function backToLibrary() {
   router.push({ name: 'StudentPortal' })
 }
 
-// 初始化:选择第一个科目
-if (subjectOptions.value.length > 0) {
-  activeSubjectId.value = subjectOptions.value[0].id
+// 初始化:选择第一个科目（安全写法）
+const firstSubject = subjectOptions.value?.[0]
+if (firstSubject) {
+  activeSubjectId.value = firstSubject.id ?? ''
 }
 </script>
 

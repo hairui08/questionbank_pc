@@ -13,9 +13,6 @@
       {{ rule.displayName }} - {{ rule.description }}
     </option>
   </select>
-  <p class="help-text" v-if="selectedRule">
-    {{ selectedRule.paramPlaceholder !== '-' ? `参数说明：${selectedRule.paramPlaceholder}` : '' }}
-  </p>
 </template>
 
 <script setup lang="ts">
@@ -84,12 +81,5 @@ function handleChange(event: Event) {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
-}
-
-.help-text {
-  font-size: 12px;
-  color: var(--secondary-text);
-  margin: 0;
-  font-style: italic;
 }
 </style>

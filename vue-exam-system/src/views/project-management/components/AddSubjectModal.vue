@@ -1,8 +1,8 @@
 <template>
   <BaseModal
     v-model:visible="isVisible"
-    title="新增科目"
-    description="补充科目信息后提交，系统自动归类至选定项目。"
+    :title="props.editingSubject ? '编辑科目' : '新增科目'"
+    :description="props.editingSubject ? '修改科目基本信息。' : '补充科目信息后提交，系统自动归类至选定项目。'"
     @confirm="handleSubmit"
     @cancel="handleCancel"
   >
@@ -25,32 +25,17 @@
       </div>
 
       <div class="form-group">
-        <label for="subject-year">年份</label>
-        <select id="subject-year" v-model="formData.year">
-          <option v-for="year in yearOptions" :key="year" :value="year">
-            {{ year }}
-          </option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="subject-order">排序 *</label>
-        <input
-          id="subject-order"
-          v-model.number="formData.order"
-          type="number"
-          min="1"
-          placeholder="请输入排序号"
-          required
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="subject-status">状态</label>
-        <select id="subject-status" v-model="formData.status">
-          <option value="active">启用</option>
-          <option value="disabled">禁用</option>
-        </select>
+        <label>状态</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" value="active" v-model="formData.status" />
+            <span>启用</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" value="disabled" v-model="formData.status" />
+            <span>禁用</span>
+          </label>
+        </div>
       </div>
     </form>
   </BaseModal>
@@ -61,12 +46,13 @@ import { ref, computed, watch } from 'vue'
 import BaseModal from '@/components/Modal/BaseModal.vue'
 import { useProjectStore } from '@/stores/project'
 import { useToast } from '@/composables/useToast'
-import type { SubjectFormData } from '../types'
+import type { SubjectFormData, Subject } from '../types'
 
 interface Props {
   visible: boolean
   projectId: string
   projectName: string
+  editingSubject?: Subject
 }
 
 const props = defineProps<Props>()
@@ -84,30 +70,27 @@ const isVisible = computed({
   set: (val) => emit('update:visible', val)
 })
 
-const currentYear = new Date().getFullYear()
-const yearOptions = [currentYear, currentYear - 1, currentYear - 2]
-
 const formData = ref<SubjectFormData>({
   projectId: '',
   projectName: '',
   name: '',
-  year: currentYear,
-  status: 'active',
-  order: 1
+  status: 'disabled',
+  order: 0 // 默认值，提交时会在store中重新计算
 })
 
-// 监听props变化，更新表单
-watch([() => props.visible, () => props.projectId], ([visible, projectId]) => {
+// 监听props变化，重置或预填表单
+watch([() => props.visible, () => props.projectId, () => props.editingSubject], ([visible, projectId]) => {
   if (visible && projectId) {
-    const subjects = projectStore.getSubjectsByProjectId(projectId)
+    const editingSubject = props.editingSubject
+    const isEdit = Boolean(editingSubject)
     formData.value = {
-      projectId: props.projectId,
-      projectName: props.projectName,
-      name: '',
-      year: currentYear,
-      status: 'active',
-      order: subjects.length + 1
+      projectId: isEdit && editingSubject ? editingSubject.projectId : props.projectId,
+      projectName: isEdit && editingSubject ? editingSubject.projectName : props.projectName,
+      name: isEdit && editingSubject ? editingSubject.name : '',
+      status: 'disabled',
+      order: isEdit && editingSubject ? editingSubject.order : 0 // 新增时order无效，store会自动设置为最大值+1
     }
+    console.log(`[AddSubjectModal] ${isEdit ? '编辑模式' : '新增模式'} status:`, formData.value.status)
   }
 }, { immediate: true })
 
@@ -119,22 +102,27 @@ const validate = (): boolean => {
     return false
   }
 
-  // 验证科目名称唯一性（同一项目下,仅检查启用状态的科目）
+  // 验证科目名称唯一性（同一项目下）
   const subjects = projectStore.getSubjectsByProjectId(formData.value.projectId)
-  const exists = subjects.some(s => s.name === trimmedName && s.status === 'active')
-  if (exists) {
-    showToast('当前项目下已存在同名的启用科目。', { type: 'error' })
-    return false
-  }
 
-  if (formData.value.year < currentYear) {
-    showToast('年份不能早于当年。', { type: 'error' })
-    return false
-  }
-
-  if (!Number.isInteger(formData.value.order) || formData.value.order <= 0) {
-    showToast('排序必须为正整数。', { type: 'error' })
-    return false
+  if (props.editingSubject) {
+    // 编辑模式：允许保持原名，或检查新名称唯一性（同项目内排除自身）
+    if (trimmedName !== props.editingSubject.name) {
+      const exists = subjects.some(
+        s => s.name === trimmedName && s.id !== props.editingSubject!.id
+      )
+      if (exists) {
+        showToast('当前项目下已存在同名科目。', { type: 'error' })
+        return false
+      }
+    }
+  } else {
+    // 新增模式：检查同项目内唯一性
+    const exists = subjects.some(s => s.name === trimmedName)
+    if (exists) {
+      showToast('当前项目下已存在同名科目。', { type: 'error' })
+      return false
+    }
   }
 
   return true
@@ -158,5 +146,28 @@ const handleCancel = () => {
 form {
   display: grid;
   gap: 16px;
+}
+
+.radio-group {
+  display: flex;
+  gap: 24px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.radio-label input[type="radio"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.radio-label span {
+  user-select: none;
 }
 </style>

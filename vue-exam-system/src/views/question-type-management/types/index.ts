@@ -24,16 +24,12 @@ export type Status = 'active' | 'disabled'
  */
 export interface QuestionType {
   id: string // 题型ID
-  subjectId: string // 所属科目ID
-  subjectName: string // 所属科目名称
-  projectId: string // 所属项目ID
-  projectName: string // 所属项目名称
   internalType: InternalType // 内部题型（系统标准化）
   internalName: string // 内部题型中文名称
   displayName: string // 外部显示名称（用户看到的）
-  description: string // 题型描述
   order: number // 排序（正整数，1-999）
   status: Status // 状态
+  subjectId: string // 关联的科目ID
   createdAt: Date // 创建时间
   updatedAt: Date // 更新时间
 }
@@ -42,34 +38,11 @@ export interface QuestionType {
  * 题型表单数据
  */
 export interface QuestionTypeFormData {
-  subjectId: string // 所属科目ID
-  subjectName: string // 所属科目名称
-  projectId: string // 所属项目ID
-  projectName: string // 所属项目名称
   internalType: InternalType // 内部题型
   displayName: string // 外部显示名称
-  description: string // 题型描述
   order: number // 排序
   status: Status // 状态
-}
-
-/**
- * 项目树节点
- */
-export interface ProjectTreeNode {
-  id: string
-  name: string
-  subjects: SubjectTreeNode[]
-}
-
-/**
- * 科目树节点
- */
-export interface SubjectTreeNode {
-  id: string
-  name: string
-  projectId: string
-  projectName: string
+  subjectId?: string // 关联的科目ID（可选，通过上下文自动设置）
 }
 
 /**
@@ -93,3 +66,24 @@ export const INTERNAL_TYPE_OPTIONS = [
   { value: InternalType.JUDGMENT, label: '判断题' },
   { value: InternalType.COMBINATION, label: '组合题' }
 ]
+
+/**
+ * 科目树节点
+ */
+export interface SubjectTreeNode {
+  id: string
+  name: string
+  icon?: string
+  count?: number
+}
+
+/**
+ * 项目树节点
+ */
+export interface ProjectTreeNode {
+  id: string
+  name: string
+  icon?: string
+  count?: number
+  subjects: SubjectTreeNode[]
+}

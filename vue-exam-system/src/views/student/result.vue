@@ -110,8 +110,8 @@
 
       <!-- 操作按钮 -->
       <div class="action-buttons">
-        <button class="action-btn secondary" @click="backToLibrary">
-          返回题库
+        <button class="action-btn secondary" @click="backToRecords">
+          返回答题记录
         </button>
         <button class="action-btn primary" @click="redoExam">
           重新做题
@@ -123,27 +123,71 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useExamSessionStore } from '@/stores/examSession'
+import { useQuestionStore } from '@/stores/question'
 import ExamHeader from '@/components/Exam/ExamHeader.vue'
 import type { Question } from '@/views/question-management/types'
+import type { UserAnswer } from '@/stores/examSession'
 
 const router = useRouter()
+const route = useRoute()
 const examSessionStore = useExamSessionStore()
+const questionStore = useQuestionStore()
 
 const activeFilter = ref<'all' | 'correct' | 'incorrect' | 'partial' | 'unanswered'>('all')
 
-// 成绩结果
-const scoreResult = computed(() => examSessionStore.calculateScore())
+// 历史记录数据状态
+const historyRecord = ref<{
+  examId: string
+  examTitle: string
+  questions: Question[]
+  answers: Record<string, UserAnswer>
+  score: number
+  totalScore: number
+  timeSpent: number
+  correctCount: number
+  incorrectCount: number
+  partialCount: number
+  unansweredCount: number
+} | null>(null)
+
+// 成绩结果（兼容两种模式）
+const scoreResult = computed(() => {
+  if (historyRecord.value) {
+    // 历史记录模式
+    return {
+      score: historyRecord.value.score,
+      totalQuestions: historyRecord.value.questions.length,
+      correctCount: historyRecord.value.correctCount,
+      incorrectCount: historyRecord.value.incorrectCount,
+      partialCount: historyRecord.value.partialCount,
+      unansweredCount: historyRecord.value.unansweredCount,
+      timeSpent: historyRecord.value.timeSpent
+    }
+  }
+  // 当前会话模式
+  return examSessionStore.calculateScore()
+})
 
 // 当前会话
 const currentSession = computed(() => examSessionStore.currentSession)
 
-// 题目列表
-const questions = computed(() => currentSession.value?.questions || [])
+// 题目列表（兼容两种模式）
+const questions = computed(() => {
+  if (historyRecord.value) {
+    return historyRecord.value.questions  // 历史记录模式
+  }
+  return currentSession.value?.questions || []  // 当前会话模式
+})
 
-// 答案记录
-const answers = computed(() => examSessionStore.answers)
+// 答案记录（兼容两种模式）
+const answers = computed(() => {
+  if (historyRecord.value) {
+    return historyRecord.value.answers  // 历史记录模式
+  }
+  return examSessionStore.answers  // 当前会话模式
+})
 
 // 用时
 const timeSpent = computed(() => {
@@ -279,10 +323,10 @@ function getAnswerStatusText(questionId: string): string {
   return '✗ 错误'
 }
 
-// 返回题库
-function backToLibrary() {
+// 返回答题记录
+function backToRecords() {
   examSessionStore.clearSession()
-  router.push('/student')
+  router.push('/student/exam-records')
 }
 
 // 重新做题
@@ -312,11 +356,84 @@ function handleDeleteRecord() {
   }
 }
 
+// 加载历史记录数据
+function loadHistoryRecord(examId: string) {
+  // TODO: 后续对接后端 API 获取历史记录详情
+  // 暂时使用 mock 数据模拟
+
+  // 从 questionStore 获取题目（模拟数据）
+  const mockQuestions = questionStore.mockQuestions.slice(0, 10)
+
+  // 模拟答案数据（根据 examId 生成不同的答案）
+  const mockAnswers: Record<string, UserAnswer> = {}
+  mockQuestions.forEach((q, index) => {
+    // 模拟不同的答题情况
+    const isAnswered = index < 8  // 前8题作答，后2题未作答
+
+    if (isAnswered) {
+      if (q.type === 'single' || q.type === 'multiple') {
+        const correctAnswer = q.answer
+        const userAnswer = index < 6 ? correctAnswer : (Array.isArray(correctAnswer) ? ['A'] : 'B')
+
+        mockAnswers[q.id] = {
+          questionId: q.id,
+          answer: userAnswer,
+          isCorrect: index < 6,
+          isPartial: false,
+          answeredAt: Date.now() - (10 - index) * 60000
+        }
+      } else if (q.type === 'judgment') {
+        const isCorrect = index < 6
+        mockAnswers[q.id] = {
+          questionId: q.id,
+          answer: isCorrect ? q.answer : (q.answer === 'true' ? 'false' : 'true'),
+          isCorrect,
+          isPartial: false,
+          answeredAt: Date.now() - (10 - index) * 60000
+        }
+      }
+    }
+  })
+
+  // 计算统计数据
+  const correctCount = Object.values(mockAnswers).filter(a => a.isCorrect).length
+  const incorrectCount = Object.values(mockAnswers).filter(a => !a.isCorrect && !a.isPartial && a.answer !== null).length
+  const partialCount = Object.values(mockAnswers).filter(a => a.isPartial).length
+  const unansweredCount = mockQuestions.length - Object.keys(mockAnswers).length
+  const score = (correctCount / mockQuestions.length) * 100
+
+  // 设置历史记录数据
+  historyRecord.value = {
+    examId,
+    examTitle: '第1章·会计政策变更专项练习',  // 暂时硬编码，后续从 API 获取
+    questions: mockQuestions,
+    answers: mockAnswers,
+    score,
+    totalScore: 100,
+    timeSpent: 25 * 60 * 1000,  // 25分钟
+    correctCount,
+    incorrectCount,
+    partialCount,
+    unansweredCount
+  }
+}
+
 // 页面加载时检查是否有成绩
 onMounted(() => {
-  if (!currentSession.value || !currentSession.value.isCompleted) {
-    // 如果没有完成的会话，返回题库
-    router.push('/student')
+  const examId = route.params.id as string
+
+  // 检查是否是当前答题会话
+  if (currentSession.value?.examId === examId && currentSession.value.isCompleted) {
+    // 模式1：使用当前会话数据（刚提交试卷后查看）
+    return
+  }
+
+  // 模式2：加载历史记录（从答题记录列表进入）
+  if (examId) {
+    loadHistoryRecord(examId)
+  } else {
+    // 没有 examId，跳转到答题记录页
+    router.push('/student/exam-records')
   }
 })
 </script>

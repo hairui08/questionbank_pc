@@ -5,21 +5,25 @@
       <template #prototype>
         <div class="tab-panel">
           <div class="prototype-wrapper">
-            <SubjectTree :active-subject-id="activeSubject?.id" @subject-change="handleSubjectChange" />
+            <SubjectTree :active-filter="activeFilter" @filter-change="handleFilterChange" />
 
             <KnowledgePointTable
-              v-if="activeSubject"
-              :subject-id="activeSubject.id"
-              :subject-name="activeSubject.name"
-              :project-name="activeSubject.projectName"
+              v-if="activeFilter.subjectId"
+              :subject-id="activeFilter.subjectId"
+              :subject-name="activeSubjectName"
+              :project-name="activeProjectName"
               :knowledge-points="filteredKnowledgePoints"
               :status-filter="statusFilter"
+              :is-add-enabled="isAddEnabled"
               @add-knowledge-point="openAddKnowledgePointModal"
               @edit-knowledge-point="openEditKnowledgePointModal"
               @delete-knowledge-point="openDeleteKnowledgePointModal"
               @toggle-status="openToggleStatusModal"
               @show-questions="openQuestionListModal"
               @update:status-filter="statusFilter = $event"
+              @batch-enable="handleBatchEnable"
+              @batch-disable="handleBatchDisable"
+              @batch-delete="handleBatchDelete"
             />
           </div>
         </div>
@@ -99,7 +103,7 @@
                   <tr>
                     <td>知识点列表</td>
                     <td>表格展示知识点信息</td>
-                    <td>包含知识点名称、章、节、试题数量、创建时间、创建人、操作列</td>
+                    <td>包含知识点名称、章、节、难易程度、出现频率、试题数量、创建时间、创建人、操作列</td>
                     <td>P0</td>
                   </tr>
                   <tr>
@@ -112,6 +116,12 @@
                     <td>编辑知识点</td>
                     <td>知识点行【编辑】按钮打开弹窗</td>
                     <td>预填现有数据,允许修改名称和关联章节,执行重复校验</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>星级评分</td>
+                    <td>为知识点设置难易程度和出现频率</td>
+                    <td>两个字段均为1-5星评分,添加/编辑时通过点击星星选择,列表中以金色星星显示,只读模式</td>
                     <td>P0</td>
                   </tr>
                   <tr>
@@ -180,6 +190,36 @@
                     <td>淡红色背景,深红色文字,圆角徽章</td>
                     <td>P0</td>
                   </tr>
+                  <tr>
+                    <td>软删除操作</td>
+                    <td>支持将知识点标记为已删除而不是物理删除</td>
+                    <td>点击删除按钮后,知识点状态变为deleted,仍可查询;已删除知识点在列表中默认不显示,可通过筛选器查看;提供恢复功能;关联的试题仍可显示知识点名称但带"已删除"标签</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>标记过时操作</td>
+                    <td>支持将知识点标记为已过时</td>
+                    <td>操作列提供"标记过时"按钮;点击后知识点状态变为deprecated;已过时知识点仍可在试题管理时选择,但有警告提示</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>状态标签显示</td>
+                    <td>在知识点列表和试卷中显示知识点状态标签</td>
+                    <td>已删除知识点显示红色"已删除"标签;已过时知识点显示黄色"已过时"标签;禁用知识点显示灰色"已禁用"标签;状态标签显示在知识点名称右侧</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>恢复已删除知识点</td>
+                    <td>支持恢复被软删除的知识点</td>
+                    <td>在已删除知识点列表中,操作列提供"恢复"按钮;点击后知识点状态恢复为active;Toast提示"知识点已恢复";关联试题的"已删除"标签自动消失</td>
+                    <td>P1</td>
+                  </tr>
+                  <tr>
+                    <td>取消过时标记</td>
+                    <td>支持取消知识点的过时标记</td>
+                    <td>在已过时知识点列表中,操作列提供"取消过时"按钮;点击后知识点状态恢复为active;Toast提示"已取消过时标记"</td>
+                    <td>P1</td>
+                  </tr>
                 </tbody>
               </table>
 
@@ -200,6 +240,24 @@
                   <tr>
                     <td>知识点名称</td>
                     <td>String</td>
+                  <tr>
+                    <td>难易程度</td>
+                    <td>Integer</td>
+                    <td>1-5星</td>
+                    <td>✓</td>
+                    <td>无</td>
+                    <td>3</td>
+                    <td>1星(简单)到5星(困难),用金色星星显示</td>
+                  </tr>
+                  <tr>
+                    <td>出现频率</td>
+                    <td>Integer</td>
+                    <td>1-5星</td>
+                    <td>✓</td>
+                    <td>无</td>
+                    <td>3</td>
+                    <td>1星(低频)到5星(高频),用金色星星显示</td>
+                  </tr>
                     <td>1-100字符</td>
                     <td>✓</td>
                     <td>科目内唯一</td>
@@ -290,11 +348,29 @@
                   <tr>
                     <td>知识点状态</td>
                     <td>Enum</td>
-                    <td>active/disabled</td>
+                    <td>4种状态</td>
                     <td>✓</td>
                     <td>无</td>
                     <td>active</td>
-                    <td>禁用后不影响试题关联</td>
+                    <td>active(启用) / disabled(禁用) / deleted(已删除) / deprecated(已过时);已删除和已过时知识点默认不显示,可通过筛选器查看;不影响已关联试题的数据完整性</td>
+                  </tr>
+                  <tr>
+                    <td>删除时间</td>
+                    <td>DateTime</td>
+                    <td>ISO 8601格式</td>
+                    <td>×</td>
+                    <td>无</td>
+                    <td>null</td>
+                    <td>仅当状态为deleted时有值;记录软删除时间</td>
+                  </tr>
+                  <tr>
+                    <td>标记过时时间</td>
+                    <td>DateTime</td>
+                    <td>ISO 8601格式</td>
+                    <td>×</td>
+                    <td>无</td>
+                    <td>null</td>
+                    <td>仅当状态为deprecated时有值;记录标记过时的时间</td>
                   </tr>
                 </tbody>
               </table>
@@ -444,6 +520,30 @@
                       <td>筛选器默认选中"启用",表格仅显示8个启用知识点,禁用知识点不显示</td>
                     </tr>
                     <tr>
+                      <td>AC-27</td>
+                      <td>用户打开添加知识点弹窗</td>
+                      <td>难易程度和出现频率默认为3星,点击第5颗星,提交表单</td>
+                      <td>知识点添加成功,列表中对应字段显示5颗金色实心星★</td>
+                    </tr>
+                    <tr>
+                      <td>AC-28</td>
+                      <td>用户打开编辑知识点弹窗</td>
+                      <td>查看星级字段预填情况</td>
+                      <td>难易程度和出现频率正确显示当前星级,可通过点击修改</td>
+                    </tr>
+                    <tr>
+                      <td>AC-29</td>
+                      <td>用户查看知识点列表</td>
+                      <td>观察难易程度和出现频率列</td>
+                      <td>所有知识点正确显示1-5颗金色星星,实心星表示评分,空心星☆占位,鼠标悬停无交互(只读模式)</td>
+                    </tr>
+                    <tr>
+                      <td>AC-30</td>
+                      <td>用户在添加/编辑弹窗中</td>
+                      <td>鼠标悬停在第4颗星上,观察视觉反馈</td>
+                      <td>前4颗星变为实心★(预览效果),移开鼠标后恢复到实际选中的星级</td>
+                    </tr>
+                    <tr>
                       <td>AC-23</td>
                       <td>用户在"财务战略管理"科目下,当前筛选器为"启用"</td>
                       <td>选择筛选器"禁用"</td>
@@ -466,6 +566,42 @@
                       <td>用户在"财务战略管理"科目下,筛选器为"启用",仅显示1个知识点</td>
                       <td>用户禁用该唯一知识点,确认禁用操作</td>
                       <td>该知识点从列表中消失,显示空状态提示"当前科目下没有启用的知识点",提示文案下方显示"可通过筛选器查看已禁用知识点"</td>
+                    </tr>
+                    <tr>
+                      <td>AC-31</td>
+                      <td>用户在知识点列表中点击某个知识点的【删除】按钮</td>
+                      <td>确认软删除</td>
+                      <td>知识点状态变为deleted,列表中该知识点消失,Toast提示"知识点已删除",知识点数据仍保留在数据库中;关联的试题仍可显示该知识点名称但带红色"已删除"标签</td>
+                    </tr>
+                    <tr>
+                      <td>AC-32</td>
+                      <td>用户在知识点列表中点击某个知识点的【标记过时】按钮</td>
+                      <td>确认标记过时</td>
+                      <td>知识点状态变为deprecated,知识点右侧显示黄色"已过时"标签,Toast提示"已标记为过时";该知识点仍可在试题管理时选择,但有警告提示</td>
+                    </tr>
+                    <tr>
+                      <td>AC-33</td>
+                      <td>用户在知识点列表筛选器中选择状态"已删除"</td>
+                      <td>查看已删除知识点列表</td>
+                      <td>列表显示所有已删除知识点,每个知识点右侧显示红色"已删除"标签,操作列提供【恢复】按钮</td>
+                    </tr>
+                    <tr>
+                      <td>AC-34</td>
+                      <td>用户在知识点列表筛选器中选择状态"已过时"</td>
+                      <td>查看已过时知识点列表</td>
+                      <td>列表显示所有已过时知识点,每个知识点右侧显示黄色"已过时"标签,操作列提供【取消过时】按钮</td>
+                    </tr>
+                    <tr>
+                      <td>AC-35</td>
+                      <td>用户在已删除知识点列表中点击某个知识点的【恢复】按钮</td>
+                      <td>确认恢复</td>
+                      <td>知识点状态恢复为active,知识点从已删除列表中消失,Toast提示"知识点已恢复";关联试题的红色"已删除"标签自动消失,知识点重新出现在正常列表中</td>
+                    </tr>
+                    <tr>
+                      <td>AC-36</td>
+                      <td>用户在已过时知识点列表中点击某个知识点的【取消过时】按钮</td>
+                      <td>确认取消过时标记</td>
+                      <td>知识点状态恢复为active,黄色"已过时"标签消失,Toast提示"已取消过时标记";试题管理中选择该知识点时不再有警告提示</td>
                     </tr>
                   </tbody>
                 </table>
@@ -490,6 +626,7 @@
     <AddKnowledgePointModal
       :visible="addModalVisible"
       :active-subject="activeSubject"
+      :active-node="activeNode"
       @update:visible="addModalVisible = $event"
       @submit="handleAddKnowledgePoint"
     />
@@ -497,6 +634,7 @@
     <EditKnowledgePointModal
       :visible="editModalVisible"
       :knowledge-point="editingKnowledgePoint"
+      :active-node="activeNode"
       @update:visible="editModalVisible = $event"
       @submit="handleEditKnowledgePoint"
     />
@@ -506,6 +644,7 @@
       :title="deleteModalTitle"
       :message="deleteModalMessage"
       :error-message="deleteModalError"
+      :confirm-button-text="deleteModalButtonText"
       @update:visible="deleteModalVisible = $event"
       @confirm="handleDeleteConfirm"
     />
@@ -528,8 +667,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useKnowledgePointStore } from '@/stores/knowledgePoint'
+import { useChapterStore } from '@/stores/chapter'
 import { useToast } from '@/composables/useToast'
 import AppLayout from '@/components/Layout/AppLayout.vue'
 import TabNavigation from '@/components/Tab/TabNavigation.vue'
@@ -538,15 +678,17 @@ import SubjectTree from './components/SubjectTree.vue'
 import KnowledgePointTable from './components/KnowledgePointTable.vue'
 import AddKnowledgePointModal from './components/AddKnowledgePointModal.vue'
 import EditKnowledgePointModal from './components/EditKnowledgePointModal.vue'
-import DeleteConfirmModal from '@/views/chapter-management/components/DeleteConfirmModal.vue'
+import DeleteConfirmModal from '@/views/category-management/components/DeleteConfirmModal.vue'
 import QuestionListModal from './components/QuestionListModal.vue'
 import type {
   KnowledgePoint,
   KnowledgePointFormData,
-  SubjectTreeNode
+  SubjectTreeNode,
+  FilterState
 } from './types'
 
 const knowledgePointStore = useKnowledgePointStore()
+const chapterStore = useChapterStore()
 const { toastVisible, toastMessage, toastType, showToast } = useToast()
 
 // 标签页配置
@@ -556,11 +698,81 @@ const tabs = [
   { key: 'style-guide', label: '样式指南', icon: '🎯' }
 ]
 
-// 当前选中的科目
-const activeSubject = ref<SubjectTreeNode | null>(null)
+// 当前激活的筛选器（科目/章/节）
+const activeFilter = ref<FilterState>({
+  type: 'subject',
+  id: '',
+  subjectId: ''
+})
 
-// 状态筛选
-const statusFilter = ref<string>('active')
+// 当前激活的节点（包含完整信息）
+const activeNode = ref<{
+  type: 'subject' | 'chapter' | 'section'
+  id: string
+  name: string
+  chapterId?: string
+  chapterName?: string
+  subjectId: string
+} | null>(null)
+
+// 添加按钮是否启用 - 只有点击章节后才启用
+const isAddEnabled = computed(() => {
+  return activeFilter.value.type === 'chapter' || activeFilter.value.type === 'section'
+})
+
+// 状态筛选（默认显示全部）
+const statusFilter = ref<string>('all')
+
+// 切换科目时重置状态筛选，确保默认展示全部数据
+watch(
+  () => activeFilter.value.subjectId,
+  (newSubjectId, oldSubjectId) => {
+    if (newSubjectId !== oldSubjectId) {
+      statusFilter.value = 'all'
+    }
+  }
+)
+
+// 当前科目名称（用于表格显示）
+const activeSubjectName = computed(() => {
+  if (!activeFilter.value.subjectId) return ''
+  const projects = knowledgePointStore.projectTreeWithChapters
+  for (const project of projects) {
+    const subject = project.subjects.find(s => s.id === activeFilter.value.subjectId)
+    if (subject) return subject.name
+  }
+  return ''
+})
+
+// 当前项目名称（用于表格显示）
+const activeProjectName = computed(() => {
+  if (!activeFilter.value.subjectId) return ''
+  const projects = knowledgePointStore.projectTreeWithChapters
+  for (const project of projects) {
+    const subject = project.subjects.find(s => s.id === activeFilter.value.subjectId)
+    if (subject) return project.name
+  }
+  return ''
+})
+
+// 当前选中的科目对象（用于传递给弹窗组件）
+const activeSubject = computed<SubjectTreeNode | null>(() => {
+  if (!activeFilter.value.subjectId) return null
+  const projects = knowledgePointStore.projectTreeWithChapters
+  for (const project of projects) {
+    const subject = project.subjects.find(s => s.id === activeFilter.value.subjectId)
+    if (subject) {
+      return {
+        id: subject.id,
+        projectId: subject.projectId,
+        projectName: project.name,
+        name: subject.name,
+        chapters: subject.chapters
+      }
+    }
+  }
+  return null
+})
 
 // 弹窗控制
 const addModalVisible = ref(false)
@@ -575,6 +787,7 @@ const editingKnowledgePoint = ref<KnowledgePoint | null>(null)
 const deleteModalTitle = ref('')
 const deleteModalMessage = ref('')
 const deleteModalError = ref('')
+const deleteModalButtonText = ref('确认删除')
 const deletingKnowledgePoint = ref<KnowledgePoint | null>(null)
 const confirmActionType = ref<'delete' | 'disable'>('delete')
 
@@ -583,11 +796,30 @@ const selectedKnowledgePointId = ref('')
 const selectedKnowledgePointName = ref('')
 
 /**
- * 当前科目的知识点列表
+ * 当前科目的知识点列表（根据筛选器类型精确筛选）
  */
 const currentKnowledgePoints = computed(() => {
-  if (!activeSubject.value) return []
-  return knowledgePointStore.getKnowledgePointsBySubject(activeSubject.value.id).value
+  if (!activeFilter.value.subjectId) return []
+
+  const allKps = knowledgePointStore.getKnowledgePointsBySubject(activeFilter.value.subjectId).value
+
+  // 根据筛选器类型进行精确筛选
+  if (activeFilter.value.type === 'subject') {
+    // 选择科目：显示该科目下所有知识点
+    return allKps
+  } else if (activeFilter.value.type === 'chapter') {
+    // 选择章：仅显示关联到该章的知识点
+    const filterSectionId = getFilterSectionId(activeFilter.value.id, activeFilter.value.type)
+    if (!filterSectionId) return []
+    return allKps.filter(kp => kp.chapterIds?.includes(filterSectionId))
+  } else if (activeFilter.value.type === 'section') {
+    // 选择子节：显示关联到该子节所属章的知识点
+    const filterSectionId = getFilterSectionId(activeFilter.value.id, activeFilter.value.type)
+    if (!filterSectionId) return []
+    return allKps.filter(kp => kp.chapterIds?.includes(filterSectionId))
+  }
+
+  return []
 })
 
 /**
@@ -601,27 +833,125 @@ const filteredKnowledgePoints = computed(() => {
 })
 
 /**
+ * 根据子节ID查找所属的section ID
+ */
+function findSectionIdBySubSection(subSectionId: string): string | null {
+  // 首先检查是否是子节ID，确保 subSections.value 存在
+  if (!chapterStore.subSections.value) {
+    return null
+  }
+  
+  const subSection = chapterStore.subSections.value.find(ss => ss.id === subSectionId)
+  if (subSection) {
+    // 如果是子节，返回其父section的ID
+    return subSection.sectionId
+  }
+  
+  return null
+}
+
+/**
+ * 根据章节或子节ID查找最终用于筛选的section ID
+ */
+function getFilterSectionId(id: string, filterType: 'subject' | 'chapter' | 'section'): string | null {
+  if (filterType === 'section') {
+    // 检查是否是子节ID
+    const sectionId = findSectionIdBySubSection(id)
+    if (sectionId) {
+      return sectionId
+    }
+  }
+  return id
+}
+
+/**
  * 初始化: 选中第一个科目
  */
 onMounted(() => {
-  const firstProject = knowledgePointStore.projectTree[0]
+  const firstProject = knowledgePointStore.projectTreeWithChapters[0]
   if (firstProject && firstProject.subjects.length > 0) {
-    activeSubject.value = firstProject.subjects[0]
+    const firstSubject = firstProject.subjects[0]
+    activeFilter.value = {
+      type: 'subject',
+      id: firstSubject.id,
+      subjectId: firstSubject.id
+    }
   }
 })
 
 /**
- * 科目切换事件
+ * 筛选器切换事件（科目/章/节）
  */
-const handleSubjectChange = (subject: SubjectTreeNode) => {
-  activeSubject.value = subject
+const handleFilterChange = (filter: FilterState) => {
+  activeFilter.value = filter
+  
+  // 更新activeNode信息
+  const projects = knowledgePointStore.projectTreeWithChapters
+  let nodeInfo = null
+  
+  if (filter.type === 'subject') {
+    // 科目节点
+    for (const project of projects) {
+      const subject = project.subjects.find(s => s.id === filter.id)
+      if (subject) {
+        nodeInfo = {
+          type: 'subject',
+          id: subject.id,
+          name: subject.name,
+          subjectId: subject.id
+        }
+        break
+      }
+    }
+  } else if (filter.type === 'chapter') {
+    // 章节节点
+    for (const project of projects) {
+      for (const subject of project.subjects) {
+        const chapter = subject.chapters.find(ch => ch.id === filter.id)
+        if (chapter) {
+          nodeInfo = {
+            type: 'chapter',
+            id: chapter.id,
+            name: chapter.name,
+            subjectId: subject.id
+          }
+          break
+        }
+      }
+      if (nodeInfo) break
+    }
+  } else if (filter.type === 'section') {
+    // 小节节点
+    for (const project of projects) {
+      for (const subject of project.subjects) {
+        for (const chapter of subject.chapters) {
+          const section = chapter.sections.find(sec => sec.id === filter.id)
+          if (section) {
+            nodeInfo = {
+              type: 'section',
+              id: section.id,
+              name: section.name,
+              chapterId: chapter.id,
+              chapterName: chapter.name,
+              subjectId: subject.id
+            }
+            break
+          }
+        }
+        if (nodeInfo) break
+      }
+      if (nodeInfo) break
+    }
+  }
+  
+  activeNode.value = nodeInfo
 }
 
 /**
  * 打开添加知识点弹窗
  */
 const openAddKnowledgePointModal = () => {
-  if (!activeSubject.value) {
+  if (!activeFilter.value.subjectId) {
     showToast('请先选择科目', { type: 'error' })
     return
   }
@@ -667,14 +997,8 @@ const openDeleteKnowledgePointModal = (kp: KnowledgePoint) => {
   confirmActionType.value = 'delete'
   deletingKnowledgePoint.value = kp
   deleteModalTitle.value = '确认删除知识点'
-
-  const questionCount = knowledgePointStore.getQuestionCountByKnowledgePoint(kp.id)
-  if (questionCount > 0) {
-    deleteModalMessage.value = `该知识点"${kp.name}"已被${questionCount}道试题引用,删除后这些试题将失去知识点关联,确定继续吗?`
-  } else {
-    deleteModalMessage.value = `确定要删除知识点"${kp.name}"吗?删除后无法恢复。`
-  }
-
+  deleteModalMessage.value = `确定要删除知识点"${kp.name}"吗？`
+  deleteModalButtonText.value = '确认删除'
   deleteModalError.value = ''
   deleteModalVisible.value = true
 }
@@ -712,14 +1036,8 @@ const openToggleStatusModal = (kp: KnowledgePoint) => {
   confirmActionType.value = 'disable'
   deletingKnowledgePoint.value = kp
   deleteModalTitle.value = '确认禁用知识点'
-
-  const questionCount = knowledgePointStore.getQuestionCountByKnowledgePoint(kp.id)
-  if (questionCount > 0) {
-    deleteModalMessage.value = `确定要禁用知识点"${kp.name}"吗?\n\n禁用后的影响:\n· 该知识点已被 ${questionCount} 道试题引用\n· 禁用后,学生在答题界面将看不到该知识点标签\n· 试题本身不受影响,仍可正常查看和编辑\n· 知识点管理页面默认不显示已禁用项,可通过筛选查看`
-  } else {
-    deleteModalMessage.value = `确定要禁用知识点"${kp.name}"吗?\n\n禁用后可通过筛选器重新启用。`
-  }
-
+  deleteModalMessage.value = `确定要禁用知识点"${kp.name}"吗？`
+  deleteModalButtonText.value = '确认禁用'
   deleteModalError.value = ''
   deleteModalVisible.value = true
 }
@@ -748,11 +1066,48 @@ const openQuestionListModal = (knowledgePointId: string) => {
     questionListModalVisible.value = true
   }
 }
+
+/**
+ * 批量启用
+ */
+const handleBatchEnable = (ids: string[]) => {
+  try {
+    knowledgePointStore.batchToggleStatus(ids, 'active')
+    showToast(`已成功启用 ${ids.length} 个知识点`, { type: 'success' })
+  } catch (error) {
+    showToast((error as Error).message, { type: 'error' })
+  }
+}
+
+/**
+ * 批量禁用
+ */
+const handleBatchDisable = (ids: string[]) => {
+  // TODO: 添加确认弹窗
+  try {
+    knowledgePointStore.batchToggleStatus(ids, 'disabled')
+    showToast(`已成功禁用 ${ids.length} 个知识点`, { type: 'success' })
+  } catch (error) {
+    showToast((error as Error).message, { type: 'error' })
+  }
+}
+
+/**
+ * 批量删除
+ */
+const handleBatchDelete = (ids: string[]) => {
+  // TODO: 添加确认弹窗
+  try {
+    knowledgePointStore.batchDelete(ids)
+    showToast(`已成功删除 ${ids.length} 个知识点`, { type: 'success' })
+  } catch (error) {
+    showToast((error as Error).message, { type: 'error' })
+  }
+}
 </script>
 
 <style scoped>
 .tab-panel {
-  padding: 32px;
   animation: fade-in 0.3s ease;
 }
 

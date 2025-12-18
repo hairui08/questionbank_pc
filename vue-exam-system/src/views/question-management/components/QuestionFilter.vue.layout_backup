@@ -1,0 +1,393 @@
+<template>
+  <div class="question-filter">
+    <!-- 题目内容搜索 -->
+    <div class="filter-search-row">
+      <div class="search-group">
+        <label>题目内容搜索</label>
+        <input
+          type="text"
+          v-model="localFilter.stemKeyword"
+          placeholder="请输入题干关键词进行搜索"
+          class="search-input"
+        />
+      </div>
+    </div>
+
+    <div class="filter-row">
+      <!-- 1. 所属项目 -->
+      <div class="filter-group">
+        <label>所属项目</label>
+        <select v-model="localFilter.projectId" @change="onProjectChange">
+          <option value="">全部项目</option>
+          <option v-for="project in projects" :key="project.id" :value="project.id">
+            {{ project.name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 2. 所属科目 -->
+      <div class="filter-group">
+        <label>所属科目</label>
+        <select v-model="localFilter.subjectId" @change="onSubjectChange" :disabled="!localFilter.projectId">
+          <option value="">{{ localFilter.projectId ? '全部科目' : '请先选择项目' }}</option>
+          <option v-for="subject in filteredSubjects" :key="subject.id" :value="subject.id">
+            {{ subject.name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 3. 所属章节 -->
+      <div class="filter-group">
+        <label>所属章节</label>
+        <select v-model="localFilter.chapterId" :disabled="!activeSubjectId">
+          <option value="">{{ activeSubjectId ? '全部章节' : '请先选择科目' }}</option>
+          <option v-for="chapter in filteredChapters" :key="chapter.id" :value="chapter.id">
+            {{ chapter.name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 4. 知识点（支持模糊搜索） -->
+      <div class="filter-group">
+        <label>知识点</label>
+        <input
+          type="text"
+          v-model="localFilter.knowledgePointKeyword"
+          :placeholder="activeSubjectId ? '输入知识点名称搜索' : '请先选择科目'"
+          :disabled="!activeSubjectId"
+          class="knowledge-point-search"
+        />
+      </div>
+
+      <!-- 5. 所属年份 -->
+      <div class="filter-group">
+        <label>所属年份</label>
+        <select v-model="localFilter.year">
+          <option value="">全部年份</option>
+          <option v-for="year in yearOptions" :key="year" :value="String(year)">
+            {{ year }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 6. 题型 -->
+      <div class="filter-group">
+        <label>题型</label>
+        <select v-model="localFilter.type">
+          <option value="">全部题型</option>
+          <option value="single">单选题</option>
+          <option value="multiple">多选题</option>
+          <option value="judgment">判断题</option>
+          <option value="essay">简答题</option>
+          <option value="combination">组合题</option>
+        </select>
+      </div>
+
+      <!-- 7. 试题频次 -->
+      <div class="filter-group">
+        <label>试题频次</label>
+        <select v-model="localFilter.frequency">
+          <option value="">全部频次</option>
+          <option value="low">低频</option>
+          <option value="medium">中频</option>
+          <option value="high">高频</option>
+        </select>
+      </div>
+
+      <!-- 8. 启用状态 -->
+      <div class="filter-group">
+        <label>启用状态</label>
+        <select v-model="localFilter.status">
+          <option value="active">启用</option>
+          <option value="disabled">禁用</option>
+          <option value="all">全部</option>
+        </select>
+      </div>
+
+      <!-- 9. 操作按钮 -->
+      <div class="filter-actions-inline">
+        <button class="btn primary" @click="handleSearch">
+          搜索
+        </button>
+        <button class="btn secondary" @click="handleReset">
+          重置
+        </button>
+      </div>
+
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, watch, computed } from 'vue'
+import { useProjectStore } from '@/stores/project'
+import { useChapterStore } from '@/stores/chapter'
+import { useKnowledgePointStore } from '@/stores/knowledgePoint'
+import type { QuestionFilter } from '../types'
+
+interface Props {
+  modelValue: QuestionFilter
+}
+
+interface Emits {
+  (e: 'update:modelValue', value: QuestionFilter): void
+  (e: 'search'): void
+  (e: 'reset'): void
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
+
+const projectStore = useProjectStore()
+const chapterStore = useChapterStore()
+const knowledgePointStore = useKnowledgePointStore()
+
+const localFilter = ref<QuestionFilter>({ ...props.modelValue })
+
+// 项目列表
+const projects = computed(() => {
+  return projectStore.projects
+})
+
+// 过滤的科目列表
+const filteredSubjects = computed(() => {
+  if (!localFilter.value.projectId) return []
+  return projectStore.subjects.filter(s => s.projectId === localFilter.value.projectId)
+})
+
+// 当前选中的科目ID（用于启用/禁用知识点筛选）
+const activeSubjectId = computed(() => localFilter.value.subjectId || '')
+
+// 过滤的章节列表
+const filteredChapters = computed(() => {
+  if (!activeSubjectId.value) return []
+  return chapterStore.chapters.filter(c => c.subjectId === activeSubjectId.value)
+})
+
+// 过滤的知识点列表
+const filteredKnowledgePoints = computed(() => {
+  if (!activeSubjectId.value) return []
+  return knowledgePointStore.knowledgePoints.filter(kp => kp.subjectId === activeSubjectId.value)
+})
+
+// 年份选项（动态计算：当前年份-10 到 当前年份）
+const yearOptions = computed(() => {
+  const currentYear = new Date().getFullYear()
+  const years: number[] = []
+  for (let year = currentYear; year >= currentYear - 10; year--) {
+    years.push(year)
+  }
+  return years
+})
+
+// 监听 props 变化同步到本地
+watch(() => props.modelValue, (newVal) => {
+  localFilter.value = { ...newVal }
+}, { deep: true })
+
+// 监听本地变化同步到父组件
+watch(localFilter, (newVal) => {
+  emit('update:modelValue', newVal)
+}, { deep: true })
+
+/**
+ * 项目切换事件
+ */
+function onProjectChange() {
+  localFilter.value.subjectId = ''
+  localFilter.value.chapterId = ''
+  localFilter.value.knowledgePointId = ''
+  localFilter.value.knowledgePointKeyword = ''
+}
+
+/**
+ * 科目切换事件
+ */
+function onSubjectChange() {
+  localFilter.value.chapterId = ''
+  localFilter.value.knowledgePointId = ''
+  localFilter.value.knowledgePointKeyword = ''
+}
+
+function handleSearch() {
+  emit('search')
+}
+
+function handleReset() {
+  localFilter.value = {}
+  emit('reset')
+}
+</script>
+
+<style scoped>
+.question-filter {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.filter-search-row {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.search-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.search-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-text);
+}
+
+.search-input,
+.knowledge-point-search {
+  padding: 8px 12px;
+  border: 1px solid #cdd5e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #ffffff;
+  transition: border-color 0.2s ease;
+}
+
+.search-input:focus,
+.knowledge-point-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.search-input:disabled,
+.knowledge-point-search:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.filter-group {
+  flex: 1;
+  min-width: 150px;
+  max-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-text);
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border: 1px solid #cdd5e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #ffffff;
+  transition: border-color 0.2s ease;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.filter-group select:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.filter-actions-inline {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex: 0 0 auto;
+  min-width: 200px;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.filter-actions-inline .btn {
+  flex: 1;
+  min-width: 90px;
+}
+
+/* 响应式：小屏幕下按钮独占一行 */
+@media (max-width: 768px) {
+  .filter-actions-inline {
+    flex: 1 1 100%;
+    order: 999;
+  }
+}
+
+.btn {
+  padding: 8px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.btn.primary {
+  background: linear-gradient(180deg, #4f77ff 0%, #2f57e3 100%);
+  color: #ffffff;
+  border-color: #375edf;
+}
+
+.btn.primary:hover {
+  background: linear-gradient(180deg, #4b6ee6 0%, #264acc 100%);
+}
+
+.btn.secondary {
+  background: #ffffff;
+  color: var(--secondary-text);
+  border-color: #d8d8d8;
+}
+
+.btn.secondary:hover {
+  background: #f5f5f5;
+}
+/* Enhanced hover effects for inputs */
+.search-input:hover:not(:disabled),
+.knowledge-point-search:hover:not(:disabled) {
+  border-color: #a8b3c1;
+}
+
+/* Enhanced hover effects for selects */
+.filter-group select:hover:not(:disabled) {
+  border-color: #a8b3c1;
+}
+
+/* Enhanced button hover with transform */
+.btn.primary:hover {
+  background: linear-gradient(180deg, #4b6ee6 0%, #264acc 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(47, 87, 227, 0.3);
+}
+
+.btn.secondary:hover {
+  background: #f5f5f5;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+</style>

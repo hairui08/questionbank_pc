@@ -6,16 +6,7 @@
     @update:visible="isVisible = $event"
     @close="handleClose"
   >
-    <form @submit.prevent="handleSubmit">
-      <div class="form-group">
-        <label>所属项目</label>
-        <input :value="projectName" type="text" readonly class="readonly-input" />
-      </div>
-
-      <div class="form-group">
-        <label>所属科目</label>
-        <input :value="subjectName" type="text" readonly class="readonly-input" />
-      </div>
+    <form class="form" @submit.prevent="handleSubmit">
 
       <div class="form-group">
         <label for="internal-type">内部题型名称 <span class="required">*</span></label>
@@ -49,16 +40,6 @@
           @input="errors.displayName = ''"
         />
         <span v-if="errors.displayName" class="error-message">{{ errors.displayName }}</span>
-      </div>
-
-      <div class="form-group">
-        <label for="description">题型描述</label>
-        <textarea
-          id="description"
-          v-model="formData.description"
-          placeholder="简要描述题型特点（0-200字符）"
-          maxlength="200"
-        ></textarea>
       </div>
 
       <div class="form-group">
@@ -101,10 +82,6 @@ import { INTERNAL_TYPE_OPTIONS } from '../types'
 // Props
 interface Props {
   visible: boolean
-  subjectId: string
-  subjectName: string
-  projectId: string
-  projectName: string
   defaultOrder: number
 }
 
@@ -121,13 +98,8 @@ const isVisible = ref(props.visible)
 
 // 表单数据
 const formData = reactive<QuestionTypeFormData>({
-  subjectId: '',
-  subjectName: '',
-  projectId: '',
-  projectName: '',
   internalType: '' as InternalType,
   displayName: '',
-  description: '',
   order: 1,
   status: 'active'
 })
@@ -146,13 +118,8 @@ watch(
     isVisible.value = newVal
     if (newVal) {
       // 重置表单
-      formData.subjectId = props.subjectId
-      formData.subjectName = props.subjectName
-      formData.projectId = props.projectId
-      formData.projectName = props.projectName
       formData.internalType = '' as InternalType
       formData.displayName = ''
-      formData.description = ''
       formData.order = props.defaultOrder
       formData.status = 'active'
       errors.internalType = ''
@@ -206,8 +173,7 @@ const handleSubmit = () => {
 
   emit('submit', {
     ...formData,
-    displayName: formData.displayName.trim(),
-    description: formData.description.trim()
+    displayName: formData.displayName.trim()
   })
   isVisible.value = false
 }

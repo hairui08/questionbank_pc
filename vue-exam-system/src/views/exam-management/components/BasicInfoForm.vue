@@ -32,9 +32,9 @@
       </div>
 
       <div class="form-group">
-        <label class="required">学习阶段</label>
+        <label class="required">分类</label>
         <select v-model="localForm.learningStageId" @blur="validateLearningStage">
-          <option value="">请选择学习阶段</option>
+          <option value="">请选择分类</option>
           <option v-for="stage in learningStages" :key="stage.id" :value="stage.id">
             {{ stage.name }}
           </option>
@@ -175,11 +175,13 @@ const filteredSubjects = computed(() => {
   return projectStore.subjects.filter(s => s.projectId === localForm.value.projectId)
 })
 
-// 获取当前科目下的学习阶段列表
+// 获取当前科目下的学习阶段列表（过滤章节练习）
 const learningStages = computed(() => {
   if (!localForm.value.subjectId) return []
   return learningStageStore.learningStages.filter(
-    stage => stage.subjectId === localForm.value.subjectId && stage.status === 'active'
+    stage => stage.subjectId === localForm.value.subjectId &&
+             stage.status === 'active' &&
+             stage.isChapterPractice !== true  // 过滤章节练习
   ).sort((a, b) => a.sortOrder - b.sortOrder)
 })
 

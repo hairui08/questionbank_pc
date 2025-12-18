@@ -10,19 +10,21 @@
               @change="toggleSelectAll"
             >
           </th>
-          <th width="30%">题目内容</th>
-          <th width="8%">题型</th>
-          <th width="10%">关联章节</th>
-          <th width="12%">关联知识点</th>
-          <th width="8%">试题难度</th>
-          <th width="10%">创建时间</th>
-          <th width="6%">创建人</th>
-          <th width="10%">操作</th>
+          <th width="22%">题目内容</th>
+          <th width="7%">题型</th>
+          <th width="8%">项目</th>
+          <th width="9%">科目</th>
+          <th width="17%">知识点</th>
+          <th width="7%">频次</th>
+          <th width="6%">状态</th>
+          <th width="10%">操作时间</th>
+          <th width="6%">操作人</th>
+          <th width="11%">操作</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="questions.length === 0">
-          <td colspan="9" class="empty-message">
+          <td colspan="11" class="empty-message">
             暂无试题数据
           </td>
         </tr>
@@ -38,8 +40,8 @@
               @change="toggleSelect(question.id)"
             >
           </td>
-          <td class="stem-cell">
-            <div class="stem-content" :title="question.stem">
+          <td class="stem-cell clickable" @click="handleEdit(question.id)">
+            <div class="stem-content" :title="`点击编辑试题: ${question.stem}`">
               {{ truncateStem(question.stem) }}
             </div>
           </td>
@@ -48,24 +50,27 @@
               {{ getTypeName(question.type) }}
             </span>
           </td>
-          <td>{{ getChapterName(question.chapterId) }}</td>
+          <td>{{ getProjectName(question.chapterId) }}</td>
+          <td>{{ getSubjectName(question.chapterId) }}</td>
           <td class="knowledge-points-cell">{{ getKnowledgePointNames(question.knowledgePointIds) }}</td>
           <td>
-            <span class="difficulty-badge" :class="`difficulty-${question.difficulty}`">
-              {{ getDifficultyName(question.difficulty) }}
+            <span class="frequency-badge" :class="`frequency-${question.frequency}`">
+              {{ getFrequencyName(question.frequency) }}
+            </span>
+          </td>
+          <td>
+            <span class="status-badge" :class="question.status">
+              {{ question.status === 'active' ? '启用' : '禁用' }}
             </span>
           </td>
           <td>{{ formatDateTime(question.createTime) }}</td>
           <td>{{ question.creatorId }}</td>
           <td>
-            <div class="action-buttons">
-              <button class="action-btn edit" @click="handleEdit(question.id)" title="编辑">
-                编辑
-              </button>
-              <button class="action-btn delete" @click="handleDelete(question.id)" title="删除">
-                删除
-              </button>
-            </div>
+            <ActionDropdown
+              :items="getMenuItems(question)"
+              trigger-text="操作"
+              @select="(key) => handleActionSelect(key, question.id)"
+            />
           </td>
         </tr>
       </tbody>
@@ -76,9 +81,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Question } from '../types'
-import { QuestionTypeNames } from '../types'
+import { QuestionTypeNames, QuestionFrequencyNames } from '../types'
+import { useProjectStore } from '@/stores/project'
 import { useChapterStore } from '@/stores/chapter'
 import { useKnowledgePointStore } from '@/stores/knowledgePoint'
+import ActionDropdown from '@/components/ActionDropdown.vue'
+import type { MenuItem } from '@/components/ActionDropdown.vue'
 
 interface Props {
   questions: Question[]
@@ -89,11 +97,13 @@ interface Emits {
   (e: 'update:selectedIds', value: string[]): void
   (e: 'edit', id: string): void
   (e: 'delete', id: string): void
+  (e: 'toggle-status', id: string): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
+const projectStore = useProjectStore()
 const chapterStore = useChapterStore()
 const knowledgePointStore = useKnowledgePointStore()
 
@@ -118,14 +128,30 @@ function toggleSelect(id: string) {
 }
 
 function truncateStem(stem: string): string {
-  return stem.length > 50 ? stem.substring(0, 50) + '...' : stem
+  return stem.length > 20 ? stem.substring(0, 20) + '...' : stem
 }
 
 function getTypeName(type: string): string {
   return QuestionTypeNames[type as keyof typeof QuestionTypeNames] || type
 }
 
-function getChapterName(chapterId: string): string {
+function getProjectName(chapterId: string): string {
+  const chapter = chapterStore.chapters.find(c => c.id === chapterId)
+  if (!chapter) return '-'
+  const subject = projectStore.subjects.find(s => s.id === chapter.subjectId)
+  if (!subject) return '-'
+  const project = projectStore.projects.find(p => p.id === subject.projectId)
+  return project?.name || '-'
+}
+
+function getSubjectName(chapterId: string): string {
+  const chapter = chapterStore.chapters.find(c => c.id === chapterId)
+  if (!chapter) return '-'
+  const subject = projectStore.subjects.find(s => s.id === chapter.subjectId)
+  return subject?.name || '-'
+}
+
+function getChapterNameOnly(chapterId: string): string {
   const chapter = chapterStore.chapters.find(c => c.id === chapterId)
   return chapter?.name || '-'
 }
@@ -141,23 +167,20 @@ function getKnowledgePointNames(knowledgePointIds?: string[]): string {
   return names.length > 0 ? names.join('、') : '-'
 }
 
-function getDifficultyName(difficulty?: string): string {
-  if (!difficulty) return '-'
-  const difficultyNames: Record<string, string> = {
-    easy: '简单',
-    medium: '中等',
-    hard: '困难'
-  }
-  return difficultyNames[difficulty] || difficulty
+function getFrequencyName(frequency?: string): string {
+  if (!frequency) return '-'
+  return QuestionFrequencyNames[frequency as keyof typeof QuestionFrequencyNames] || frequency
 }
 
 function formatDateTime(dateTime: string): string {
   const date = new Date(dateTime)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
 function handleEdit(id: string) {
@@ -166,6 +189,51 @@ function handleEdit(id: string) {
 
 function handleDelete(id: string) {
   emit('delete', id)
+}
+
+function handleToggleStatus(id: string) {
+  emit('toggle-status', id)
+}
+
+/**
+ * 获取操作菜单项
+ */
+function getMenuItems(question: Question): MenuItem[] {
+  return [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: '✏️'
+    },
+    {
+      key: 'toggle',
+      label: question.status === 'active' ? '禁用' : '启用',
+      icon: question.status === 'active' ? '🚫' : '✅'
+    },
+    {
+      key: 'delete',
+      label: '删除',
+      icon: '🗑️',
+      danger: true
+    }
+  ]
+}
+
+/**
+ * 处理菜单项选择
+ */
+function handleActionSelect(key: string, id: string) {
+  switch (key) {
+    case 'edit':
+      handleEdit(id)
+      break
+    case 'delete':
+      handleDelete(id)
+      break
+    case 'toggle':
+      handleToggleStatus(id)
+      break
+  }
 }
 </script>
 
@@ -194,6 +262,7 @@ function handleDelete(id: string) {
   color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 .question-table tbody tr {
@@ -218,6 +287,11 @@ function handleDelete(id: string) {
   font-size: 14px;
   color: var(--primary-text);
   vertical-align: middle;
+}
+
+/* 操作列单元格不换行 */
+.question-table td:last-child {
+  white-space: nowrap;
 }
 
 .empty-message {
@@ -247,7 +321,7 @@ function handleDelete(id: string) {
 }
 
 .type-badge,
-.difficulty-badge,
+.frequency-badge,
 .payment-badge {
   display: inline-block;
   padding: 4px 10px;
@@ -286,17 +360,25 @@ function handleDelete(id: string) {
   color: #00695c;
 }
 
-.difficulty-badge.difficulty-easy {
-  background: #e8f5e9;
-  color: #2e7d32;
+.frequency-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.difficulty-badge.difficulty-medium {
+.frequency-low {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.frequency-medium {
   background: #fff3e0;
-  color: #ef6c00;
+  color: #f57c00;
 }
 
-.difficulty-badge.difficulty-hard {
+.frequency-high {
   background: #ffebee;
   color: #c62828;
 }
@@ -316,38 +398,90 @@ function handleDelete(id: string) {
   color: #f57f17;
 }
 
-.action-buttons {
-  display: flex;
-  gap: 6px;
-}
-
-.action-btn {
+/* 状态徽章 */
+.status-badge {
+  display: inline-block;
   padding: 4px 10px;
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge.active {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.status-badge.disabled {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+
+/* 可点击的题干单元格 */
+.stem-cell.clickable {
   cursor: pointer;
-  border: 1px solid transparent;
+  transition: background-color 0.2s ease;
+}
+
+/* 题目内容默认显示蓝色 */
+.stem-cell.clickable .stem-content {
+  color: #667eea;
+  cursor: pointer;
+}
+
+.stem-cell.clickable:hover {
+  background-color: #f0f7ff;
+}
+
+/* 悬停时只添加下划线 */
+.stem-cell.clickable:hover .stem-content {
+  text-decoration: underline;
+}
+/* ========== Enhanced Styles ========== */
+/* ========== Enhanced Styles ========== */
+
+/* Enhanced table wrapper */
+.question-table-wrapper {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Enhanced row transition */
+.question-table tbody tr {
   transition: all 0.2s ease;
 }
 
-.action-btn.edit {
-  background: #fff3e0;
-  color: #ef6c00;
-  border-color: #ffb74d;
+/* Enhanced row hover */
+.question-table tbody tr:hover {
+  transform: scale(1.001);
 }
 
-.action-btn.edit:hover {
-  background: #ffe0b2;
+/* Enhanced frequency badges with gradients */
+.frequency-low {
+  background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%) !important;
+  color: #0d4d3f !important;
+  box-shadow: 0 2px 4px rgba(132, 250, 176, 0.3);
 }
 
-.action-btn.delete {
-  background: #ffebee;
-  color: #c62828;
-  border-color: #ef9a9a;
+.frequency-medium {
+  background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%) !important;
+  color: #5a3e06 !important;
+  box-shadow: 0 2px 4px rgba(255, 234, 167, 0.4);
 }
 
-.action-btn.delete:hover {
-  background: #ffcdd2;
+.frequency-high {
+  background: linear-gradient(135deg, #ff7675 0%, #d63031 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(255, 118, 117, 0.4);
+}
+
+/* Enhanced badge border-radius */
+.type-badge,
+.frequency-badge,
+.payment-badge,
+.status-badge {
+  border-radius: 12px;
 }
 </style>

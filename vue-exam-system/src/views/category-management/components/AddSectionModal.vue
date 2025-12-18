@@ -1,0 +1,287 @@
+<template>
+  <BaseModal
+    :visible="isVisible"
+    title="添加小节"
+    @update:visible="isVisible = $event"
+    @close="handleClose"
+  >
+    <form class="form" @submit.prevent="handleSubmit">
+      <div class="form-group">
+        <label for="parent">{{ formData.sectionId ? '所属小节' : '所属章节' }} <span class="required">*</span></label>
+        <input
+          id="parent"
+          :value="formData.sectionId ? formData.sectionName : formData.chapterName"
+          type="text"
+          readonly
+          class="readonly-input"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="section-name">{{ formData.sectionId ? '子项名称' : '小节名称' }} <span class="required">*</span></label>
+        <input
+          id="section-name"
+          v-model="formData.name"
+          type="text"
+          placeholder="请输入{{ formData.sectionId ? '子项' : '小节' }}名称（1-50字符）"
+          maxlength="50"
+          :class="{ 'is-invalid': errors.name }"
+          @input="errors.name = ''"
+        />
+        <span v-if="errors.name" class="error-message">{{ errors.name }}</span>
+      </div>
+
+      <div class="form-group">
+        <label>状态 <span class="required">*</span></label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" value="active" v-model="formData.status" />
+            <span>启用</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" value="disabled" v-model="formData.status" />
+            <span>禁用</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="section-order">排序 <span class="required">*</span></label>
+        <input
+          id="section-order"
+          v-model.number="formData.order"
+          type="number"
+          min="1"
+          max="999"
+          placeholder="请输入排序（1-999）"
+          :class="{ 'is-invalid': errors.order }"
+          @input="errors.order = ''"
+        />
+        <span v-if="errors.order" class="error-message">{{ errors.order }}</span>
+      </div>
+    </form>
+
+    <template #footer>
+      <button class="btn secondary" @click="handleClose">取消</button>
+      <button class="btn primary" @click="handleSubmit">确定</button>
+    </template>
+  </BaseModal>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, watch } from 'vue'
+import BaseModal from '@/components/Modal/BaseModal.vue'
+import type { SectionFormData, Status } from '../types'
+
+// Props
+interface Props {
+  visible: boolean
+  chapterId: string
+  chapterName: string
+  sectionId: string
+  sectionName: string
+  defaultOrder?: number
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  defaultOrder: 1
+})
+
+// Emits
+const emit = defineEmits<{
+  'update:visible': [value: boolean]
+  submit: [data: any]
+}>()
+
+// 本地visible状态
+const isVisible = ref(props.visible)
+
+// 表单数据
+const formData = reactive<any>({
+  chapterId: props.chapterId,
+  chapterName: props.chapterName,
+  sectionId: props.sectionId,
+  sectionName: props.sectionName,
+  name: '',
+  status: 'active' as Status,
+  order: props.defaultOrder
+})
+
+// 表单错误
+const errors = reactive({
+  name: '',
+  order: ''
+})
+
+// 监听visible变化
+watch(
+  () => props.visible,
+  (newVal) => {
+    isVisible.value = newVal
+    if (newVal) {
+      // 重置表单
+      formData.chapterId = props.chapterId
+      formData.chapterName = props.chapterName
+      formData.sectionId = props.sectionId
+      formData.sectionName = props.sectionName
+      formData.name = ''
+      formData.status = 'active'
+      formData.order = props.defaultOrder
+      errors.name = ''
+      errors.order = ''
+    }
+  }
+)
+
+watch(isVisible, (newVal) => {
+  emit('update:visible', newVal)
+})
+
+/**
+ * 验证表单
+ */
+const validate = (): boolean => {
+  let isValid = true
+
+  // 验证小节名称
+  if (!formData.name || formData.name.trim().length === 0) {
+    errors.name = '小节名称不能为空'
+    isValid = false
+  } else if (formData.name.length > 50) {
+    errors.name = '小节名称不能超过50个字符'
+    isValid = false
+  }
+
+  // 验证排序
+  if (!formData.order || formData.order < 1 || formData.order > 999) {
+    errors.order = '排序必须是1-999之间的正整数'
+    isValid = false
+  }
+
+  return isValid
+}
+
+/**
+ * 提交表单
+ */
+const handleSubmit = () => {
+  if (!validate()) {
+    return
+  }
+
+  emit('submit', { ...formData })
+  isVisible.value = false
+}
+
+/**
+ * 关闭弹窗
+ */
+const handleClose = () => {
+  isVisible.value = false
+}
+</script>
+
+<style scoped>
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--primary-text);
+}
+
+.form-group .required {
+  color: #e74c3c;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #dfe3eb;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.form-group input.is-invalid {
+  border-color: #e74c3c;
+}
+
+.form-group input.readonly-input {
+  background-color: #f5f5f5;
+  color: var(--secondary-text);
+  cursor: not-allowed;
+}
+
+.error-message {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #e74c3c;
+}
+
+.btn {
+  padding: 8px 20px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn.primary {
+  background: linear-gradient(180deg, #4f77ff 0%, #2f57e3 100%);
+  color: #ffffff;
+  border-color: #375edf;
+}
+
+.btn.primary:hover {
+  background: linear-gradient(180deg, #4b6ee6 0%, #264acc 100%);
+}
+
+.btn.secondary {
+  background-color: #ffffff;
+  color: var(--accent);
+  border-color: rgba(0, 102, 204, 0.4);
+}
+
+.btn.secondary:hover {
+  background-color: rgba(0, 102, 204, 0.08);
+}
+
+.radio-group {
+  display: flex;
+  gap: 24px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.radio-label input[type="radio"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.radio-label span {
+  user-select: none;
+}
+</style>

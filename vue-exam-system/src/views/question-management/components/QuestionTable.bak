@@ -1,0 +1,438 @@
+<template>
+  <div class="question-table-wrapper">
+    <table class="question-table">
+      <thead>
+        <tr>
+          <th width="50">
+            <input
+              type="checkbox"
+              :checked="isAllSelected"
+              @change="toggleSelectAll"
+            >
+          </th>
+          <th width="22%">题目内容</th>
+          <th width="7%">题型</th>
+          <th width="8%">项目</th>
+          <th width="9%">科目</th>
+          <th width="17%">知识点</th>
+          <th width="7%">试题难度</th>
+          <th width="6%">状态</th>
+          <th width="7%">创建时间</th>
+          <th width="6%">创建人</th>
+          <th width="14%">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-if="questions.length === 0">
+          <td colspan="11" class="empty-message">
+            暂无试题数据
+          </td>
+        </tr>
+        <tr
+          v-for="question in questions"
+          :key="question.id"
+          :class="{ selected: selectedIds.includes(question.id) }"
+        >
+          <td>
+            <input
+              type="checkbox"
+              :checked="selectedIds.includes(question.id)"
+              @change="toggleSelect(question.id)"
+            >
+          </td>
+          <td class="stem-cell clickable" @click="handleEdit(question.id)">
+            <div class="stem-content" :title="`点击编辑试题: ${question.stem}`">
+              {{ truncateStem(question.stem) }}
+            </div>
+          </td>
+          <td>
+            <span class="type-badge" :class="`type-${question.type}`">
+              {{ getTypeName(question.type) }}
+            </span>
+          </td>
+          <td>{{ getProjectName(question.chapterId) }}</td>
+          <td>{{ getSubjectName(question.chapterId) }}</td>
+          <td class="knowledge-points-cell">{{ getKnowledgePointNames(question.knowledgePointIds) }}</td>
+          <td>
+            <span class="difficulty-badge" :class="`difficulty-${question.difficulty}`">
+              {{ getDifficultyName(question.difficulty) }}
+            </span>
+          </td>
+          <td>
+            <span class="status-badge" :class="question.status">
+              {{ question.status === 'active' ? '启用' : '禁用' }}
+            </span>
+          </td>
+          <td>{{ formatDateTime(question.createTime) }}</td>
+          <td>{{ question.creatorId }}</td>
+          <td>
+            <ActionDropdown
+              :items="getMenuItems(question)"
+              trigger-text="操作"
+              @select="(key) => handleActionSelect(key, question.id)"
+            />
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import type { Question } from '../types'
+import { QuestionTypeNames } from '../types'
+import { useProjectStore } from '@/stores/project'
+import { useChapterStore } from '@/stores/chapter'
+import { useKnowledgePointStore } from '@/stores/knowledgePoint'
+import ActionDropdown from '@/components/ActionDropdown.vue'
+import type { MenuItem } from '@/components/ActionDropdown.vue'
+
+interface Props {
+  questions: Question[]
+  selectedIds: string[]
+}
+
+interface Emits {
+  (e: 'update:selectedIds', value: string[]): void
+  (e: 'edit', id: string): void
+  (e: 'delete', id: string): void
+  (e: 'toggle-status', id: string): void
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
+
+const projectStore = useProjectStore()
+const chapterStore = useChapterStore()
+const knowledgePointStore = useKnowledgePointStore()
+
+const isAllSelected = computed(() => {
+  return props.questions.length > 0 && props.selectedIds.length === props.questions.length
+})
+
+function toggleSelectAll(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (target.checked) {
+    emit('update:selectedIds', props.questions.map(q => q.id))
+  } else {
+    emit('update:selectedIds', [])
+  }
+}
+
+function toggleSelect(id: string) {
+  const newIds = props.selectedIds.includes(id)
+    ? props.selectedIds.filter(selectedId => selectedId !== id)
+    : [...props.selectedIds, id]
+  emit('update:selectedIds', newIds)
+}
+
+function truncateStem(stem: string): string {
+  return stem.length > 20 ? stem.substring(0, 20) + '...' : stem
+}
+
+function getTypeName(type: string): string {
+  return QuestionTypeNames[type as keyof typeof QuestionTypeNames] || type
+}
+
+function getProjectName(chapterId: string): string {
+  const chapter = chapterStore.chapters.find(c => c.id === chapterId)
+  if (!chapter) return '-'
+  const subject = projectStore.subjects.find(s => s.id === chapter.subjectId)
+  if (!subject) return '-'
+  const project = projectStore.projects.find(p => p.id === subject.projectId)
+  return project?.name || '-'
+}
+
+function getSubjectName(chapterId: string): string {
+  const chapter = chapterStore.chapters.find(c => c.id === chapterId)
+  if (!chapter) return '-'
+  const subject = projectStore.subjects.find(s => s.id === chapter.subjectId)
+  return subject?.name || '-'
+}
+
+function getChapterNameOnly(chapterId: string): string {
+  const chapter = chapterStore.chapters.find(c => c.id === chapterId)
+  return chapter?.name || '-'
+}
+
+function getKnowledgePointNames(knowledgePointIds?: string[]): string {
+  if (!knowledgePointIds || knowledgePointIds.length === 0) return '-'
+  const names = knowledgePointIds
+    .map(id => {
+      const kp = knowledgePointStore.getKnowledgePointById(id)
+      return kp?.name
+    })
+    .filter(name => name !== undefined) as string[]
+  return names.length > 0 ? names.join('、') : '-'
+}
+
+function getDifficultyName(difficulty?: string): string {
+  if (!difficulty) return '-'
+  const difficultyNames: Record<string, string> = {
+    easy: '简单',
+    medium: '中等',
+    hard: '困难'
+  }
+  return difficultyNames[difficulty] || difficulty
+}
+
+function formatDateTime(dateTime: string): string {
+  const date = new Date(dateTime)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
+function handleEdit(id: string) {
+  emit('edit', id)
+}
+
+function handleDelete(id: string) {
+  emit('delete', id)
+}
+
+function handleToggleStatus(id: string) {
+  emit('toggle-status', id)
+}
+
+/**
+ * 获取操作菜单项
+ */
+function getMenuItems(question: Question): MenuItem[] {
+  return [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: '✏️'
+    },
+    {
+      key: 'toggle',
+      label: question.status === 'active' ? '禁用' : '启用',
+      icon: question.status === 'active' ? '🚫' : '✅'
+    },
+    {
+      key: 'delete',
+      label: '删除',
+      icon: '🗑️',
+      danger: true
+    }
+  ]
+}
+
+/**
+ * 处理菜单项选择
+ */
+function handleActionSelect(key: string, id: string) {
+  switch (key) {
+    case 'edit':
+      handleEdit(id)
+      break
+    case 'delete':
+      handleDelete(id)
+      break
+    case 'toggle':
+      handleToggleStatus(id)
+      break
+  }
+}
+</script>
+
+<style scoped>
+.question-table-wrapper {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.question-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.question-table thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.question-table th {
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.question-table tbody tr {
+  border-bottom: 1px solid var(--table-border);
+  transition: background-color 0.2s ease;
+}
+
+.question-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.question-table tbody tr:hover {
+  background: var(--row-hover);
+}
+
+.question-table tbody tr.selected {
+  background: #e6f2ff;
+}
+
+.question-table td {
+  padding: 12px;
+  font-size: 14px;
+  color: var(--primary-text);
+  vertical-align: middle;
+}
+
+/* 操作列单元格不换行 */
+.question-table td:last-child {
+  white-space: nowrap;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 60px 20px !important;
+  color: var(--secondary-text);
+  font-size: 14px;
+}
+
+.stem-cell {
+  max-width: 400px;
+}
+
+.stem-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-points-cell {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.type-badge,
+.difficulty-badge,
+.payment-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.type-badge.type-single {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.type-badge.type-multiple {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.type-badge.type-judgment {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.type-badge.type-uncertain {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.type-badge.type-essay {
+  background: #fce4ec;
+  color: #c2185b;
+}
+
+.type-badge.type-combination {
+  background: #e0f2f1;
+  color: #00695c;
+}
+
+.difficulty-badge.difficulty-easy {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.difficulty-badge.difficulty-medium {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.difficulty-badge.difficulty-hard {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.payment-badge.payment-free {
+  background: #f5f5f5;
+  color: #616161;
+}
+
+.payment-badge.payment-basic {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.payment-badge.payment-premium {
+  background: #fff8e1;
+  color: #f57f17;
+}
+
+/* 状态徽章 */
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge.active {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.status-badge.disabled {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+
+/* 可点击的题干单元格 */
+.stem-cell.clickable {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+/* 题目内容默认显示蓝色 */
+.stem-cell.clickable .stem-content {
+  color: #667eea;
+  cursor: pointer;
+}
+
+.stem-cell.clickable:hover {
+  background-color: #f0f7ff;
+}
+
+/* 悬停时只添加下划线 */
+.stem-cell.clickable:hover .stem-content {
+  text-decoration: underline;
+}
+</style>

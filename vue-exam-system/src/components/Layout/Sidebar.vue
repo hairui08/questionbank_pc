@@ -1,6 +1,6 @@
 ﻿<template>
   <aside class="sidebar">
-    <div class="sidebar-header">棰樺簱绯荤粺鍚庡彴</div>
+    <div class="sidebar-header">题库管理后台</div>
     <ul class="menu">
       <li v-for="item in menuItems" :key="item.path" class="menu-item">
         <router-link
@@ -27,9 +27,8 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { path: '/project-management', label: '项目管理' },
-  { path: '/chapter-management', label: '章节管理' },
+  { path: '/category-management', label: '分类管理' },
   { path: '/payment-rule-management', label: '收费规则' },
-  { path: '/learning-stage-management', label: '学习阶段管理' },
   { path: '/knowledge-point-management', label: '知识点管理' },
   { path: '/question-type-management', label: '题型管理' },
   { path: '/question-management', label: '试题管理' },

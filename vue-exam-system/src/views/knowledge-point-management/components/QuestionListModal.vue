@@ -2,98 +2,55 @@
   <BaseModal
     :visible="isVisible"
     :title="`知识点「${knowledgePointName}」关联的试题`"
-    width="1000px"
+    width="1200px"
     @update:visible="isVisible = $event"
     @close="handleClose"
   >
     <div class="question-list-wrapper">
-      <!-- 已关联试题列表 -->
-      <div class="question-list-container">
-        <div v-if="questions.length > 0" class="preview-list">
-          <div
-            v-for="(question, index) in questions"
-            :key="question.id"
-            class="question-card"
-          >
-            <!-- 卡片头部 -->
-            <div class="card-header">
-              <div class="header-left">
-                <span class="question-number">第 {{ index + 1 }} 题</span>
+      <!-- 试题列表表格 -->
+      <div class="question-table-container">
+        <table class="question-table">
+          <thead>
+            <tr>
+              <th width="30%">题目内容</th>
+              <th width="8%">题型</th>
+              <th width="15%">关联章节</th>
+              <th width="18%">关联知识点</th>
+              <th width="8%">试题难度</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="questions.length === 0">
+              <td colspan="5" class="empty-message">
+                <div class="empty-state">
+                  <div class="empty-icon">📝</div>
+                  <p class="empty-text">暂无关联试题</p>
+                </div>
+              </td>
+            </tr>
+            <tr v-for="question in questions" :key="question.id">
+              <td class="stem-cell">
+                <div class="stem-content" :title="question.stem">
+                  {{ truncateStem(question.stem) }}
+                </div>
+              </td>
+              <td>
                 <span class="type-badge" :class="`type-${question.type}`">
                   {{ getQuestionTypeName(question.type) }}
                 </span>
-                <span class="chapter-badge">
-                  {{ getChapterName(question.chapterId) }}
+              </td>
+              <td>{{ getChapterName(question.chapterId) }}</td>
+              <td class="knowledge-points-cell">
+                {{ getKnowledgePointNames(question.knowledgePointIds) }}
+              </td>
+              <td>
+                <span class="difficulty-badge" :class="`difficulty-${question.difficulty}`">
+                  {{ getDifficultyName(question.difficulty) }}
                 </span>
-              </div>
-              <div class="header-right">
-                <button class="action-btn delete" @click="handleRemoveQuestion(question.id)" title="移除">
-                  🗑️ 移除
-                </button>
-              </div>
-            </div>
-
-            <!-- 题干部分 -->
-            <div class="question-stem">
-              <div class="stem-text">{{ question.stem }}</div>
-            </div>
-
-            <!-- 选项部分 -->
-            <div v-if="question.options && question.options.length > 0" class="question-options">
-              <div
-                v-for="option in question.options"
-                :key="option.label"
-                class="option-item"
-                :class="{ 'is-correct': isCorrectOption(question.answer, option.label) }"
-              >
-                <span class="option-label">{{ option.label }}</span>
-                <span class="option-content">{{ option.content }}</span>
-                <span v-if="isCorrectOption(question.answer, option.label)" class="correct-tag">✓ 正确答案</span>
-              </div>
-            </div>
-
-            <!-- 答案与解析 -->
-            <div class="question-answer-section">
-              <div class="answer-row">
-                <span class="answer-label">正确答案:</span>
-                <span class="answer-value">{{ formatAnswer(question.answer) }}</span>
-              </div>
-              <div class="explanation-row">
-                <span class="explanation-label">试题解析:</span>
-                <div class="explanation-text">{{ question.explanation }}</div>
-              </div>
-            </div>
-
-            <!-- 卡片底部元数据 -->
-            <div class="card-footer">
-              <span class="meta-item">
-                <span class="meta-label">难度:</span>
-                {{ getDifficultyName(question.difficulty) }}
-              </span>
-              <span class="meta-item">
-                <span class="meta-label">来源:</span>
-                {{ getSourceName(question.source) }}
-              </span>
-              <span class="meta-item">
-                <span class="meta-label">年份:</span>
-                {{ question.year }}
-              </span>
-              <span class="meta-item">
-                <span class="meta-label">创建人:</span>
-                {{ getCreatorName(question.creatorId) }}
-              </span>
-              <span class="meta-item">
-                <span class="meta-label">创建时间:</span>
-                {{ formatDateTime(question.createTime) }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="empty-state">
-          <div class="empty-icon">📝</div>
-          <p class="empty-text">暂无关联试题</p>
-        </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <!-- 分页器 -->
@@ -176,7 +133,6 @@ const emit = defineEmits<{
 
 const knowledgePointStore = useKnowledgePointStore()
 const chapterStore = useChapterStore()
-const { showToast } = useToast()
 
 // 本地visible状态
 const isVisible = ref(props.visible)
@@ -229,15 +185,10 @@ watch(isVisible, (newVal) => {
 })
 
 /**
- * 从知识点移除试题
+ * 截断题干内容
  */
-const handleRemoveQuestion = (questionId: string) => {
-  try {
-    knowledgePointStore.unlinkQuestionFromKnowledgePoint(questionId)
-    showToast('试题已从知识点中移除')
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : '移除失败', { type: 'error' })
-  }
+const truncateStem = (stem: string): string => {
+  return stem.length > 50 ? stem.substring(0, 50) + '...' : stem
 }
 
 /**
@@ -260,81 +211,34 @@ const getQuestionTypeName = (type: QuestionType): string => {
  */
 const getChapterName = (chapterId: string): string => {
   const chapter = chapterStore.chapters.find(c => c.id === chapterId)
-  return chapter ? chapter.name : '未知章节'
+  return chapter ? chapter.name : '-'
+}
+
+/**
+ * 获取知识点名称列表
+ */
+const getKnowledgePointNames = (knowledgePointIds?: string[]): string => {
+  if (!knowledgePointIds || knowledgePointIds.length === 0) return '-'
+  const names = knowledgePointIds
+    .map(id => {
+      const kp = knowledgePointStore.getKnowledgePointById(id)
+      return kp?.name
+    })
+    .filter(name => name !== undefined) as string[]
+  return names.length > 0 ? names.join('、') : '-'
 }
 
 /**
  * 获取难度中文名称
  */
 const getDifficultyName = (difficulty?: QuestionDifficulty): string => {
-  if (!difficulty) return '未设置'
+  if (!difficulty) return '-'
   const difficultyNames: Record<QuestionDifficulty, string> = {
     easy: '简单',
     medium: '中等',
     hard: '困难'
   }
   return difficultyNames[difficulty] || difficulty
-}
-
-/**
- * 获取来源中文名称
- */
-const getSourceName = (source?: QuestionSource): string => {
-  if (!source) return '未设置'
-  const sourceNames: Record<QuestionSource, string> = {
-    official: '真题',
-    simulation: '模拟',
-    custom: '自定义'
-  }
-  return sourceNames[source] || source
-}
-
-/**
- * 判断选项是否为正确答案
- */
-const isCorrectOption = (answer: string | string[], label: string): boolean => {
-  if (Array.isArray(answer)) {
-    return answer.includes(label)
-  }
-  return answer === label
-}
-
-/**
- * 格式化答案显示
- */
-const formatAnswer = (answer: string | string[]): string => {
-  if (Array.isArray(answer)) {
-    return answer.join(', ')
-  }
-  if (answer === 'true') return '正确'
-  if (answer === 'false') return '错误'
-  return answer
-}
-
-/**
- * 获取创建人名称
- */
-const getCreatorName = (creatorId: string): string => {
-  const creatorMap: Record<string, string> = {
-    'admin': '管理员',
-    'editor': '编辑员',
-    'user-001': '当前用户'
-  }
-  return creatorMap[creatorId] || creatorId
-}
-
-/**
- * 格式化日期时间
- */
-const formatDateTime = (dateTime: string): string => {
-  const date = new Date(dateTime)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
 }
 
 /**
@@ -369,213 +273,100 @@ const handleClose = () => {
   gap: 16px;
 }
 
-.question-list-container {
-  /* 移除内部滚动，依赖 BaseModal 的滚动机制 */
-}
-
-.preview-list {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.question-card {
-  background: #ffffff;
-  border: 2px solid var(--panel-border);
+.question-table-container {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
 }
 
-.question-card:hover {
-  border-color: var(--accent);
-  box-shadow: 0 4px 16px rgba(0, 102, 204, 0.15);
+.question-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #f5f8fc 0%, #e6f2ff 100%);
-  border-bottom: 1px solid var(--panel-border);
+.question-table thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.question-number {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.header-right {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
+.question-table th {
+  padding: 14px 12px;
+  text-align: left;
   font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.action-btn.delete {
-  background: #ffebee;
-  color: #c62828;
-  border-color: #ef9a9a;
-}
-
-.action-btn.delete:hover {
-  background: #ffcdd2;
-}
-
-/* 题干部分 */
-.question-stem {
-  padding: 20px 24px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.stem-text {
-  font-size: 15px;
-  line-height: 1.8;
-  color: var(--primary-text);
-  white-space: pre-wrap;
-}
-
-/* 选项部分 */
-.question-options {
-  padding: 20px 24px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.option-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  margin-bottom: 10px;
-  background: #fafcfe;
-  border: 1px solid #e4eaf2;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.option-item:last-child {
-  margin-bottom: 0;
-}
-
-.option-item.is-correct {
-  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%);
-  border-color: #66bb6a;
-}
-
-.option-label {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, #4f77ff 0%, #2f57e3 100%);
   color: #ffffff;
-  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.question-table tbody tr {
+  border-bottom: 1px solid var(--table-border);
+  transition: background-color 0.2s ease;
+}
+
+.question-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.question-table tbody tr:hover {
+  background: var(--row-hover);
+}
+
+.question-table td {
+  padding: 12px;
+  font-size: 14px;
+  color: var(--primary-text);
+  vertical-align: middle;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 0 !important;
+}
+
+.empty-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  font-size: 14px;
+  padding: 60px 20px;
+  text-align: center;
 }
 
-.option-item.is-correct .option-label {
-  background: linear-gradient(180deg, #66bb6a 0%, #43a047 100%);
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
 }
 
-.option-content {
-  flex: 1;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--primary-text);
-}
-
-.correct-tag {
-  color: #2e7d32;
-  font-weight: 600;
-  font-size: 13px;
-}
-
-/* 答案与解析 */
-.question-answer-section {
-  padding: 20px 24px;
-  background: linear-gradient(135deg, #fafcfe 0%, #f0f7ff 100%);
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.answer-row,
-.explanation-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.explanation-row {
-  margin-bottom: 0;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.answer-label,
-.explanation-label {
-  font-weight: 600;
-  color: var(--secondary-text);
-  font-size: 14px;
-}
-
-.answer-value {
+.empty-text {
+  margin: 0;
   font-size: 16px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.explanation-text {
-  font-size: 14px;
-  line-height: 1.8;
-  color: var(--primary-text);
-  white-space: pre-wrap;
-}
-
-/* 卡片底部元数据 */
-.card-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px 24px;
-  padding: 14px 20px;
-  background: #f5f8fc;
-  font-size: 13px;
   color: var(--secondary-text);
 }
 
-.meta-item {
-  display: flex;
-  gap: 6px;
-  align-items: center;
+.stem-cell {
+  max-width: 400px;
 }
 
-.meta-label {
-  font-weight: 600;
-  color: var(--primary-text);
+.stem-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-points-cell {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+  font-size: 13px;
 }
 
 /* 徽章 */
 .type-badge,
-.chapter-badge {
+.difficulty-badge {
   display: inline-block;
   padding: 4px 10px;
   border-radius: 4px;
@@ -613,36 +404,19 @@ const handleClose = () => {
   color: #00695c;
 }
 
-.chapter-badge {
-  background: #f0f0f0;
-  color: var(--secondary-text);
+.difficulty-badge.difficulty-easy {
+  background: #e8f5e9;
+  color: #2e7d32;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
+.difficulty-badge.difficulty-medium {
+  background: #fff3e0;
+  color: #ef6c00;
 }
 
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-text {
-  margin: 0 0 8px;
-  font-size: 16px;
-  color: var(--secondary-text);
-}
-
-.empty-hint {
-  margin: 0;
-  font-size: 14px;
-  color: #999;
+.difficulty-badge.difficulty-hard {
+  background: #ffebee;
+  color: #c62828;
 }
 
 .btn.primary {

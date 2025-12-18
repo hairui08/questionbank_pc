@@ -2,78 +2,114 @@
   <BaseModal
     :visible="isVisible"
     title="选择知识点"
-    width="600px"
+    width="800px"
     @update:visible="isVisible = $event"
     @close="handleClose"
   >
     <div class="knowledge-point-select">
-      <!-- 项目和科目筛选 -->
-      <div class="filter-section">
-        <div class="filter-row">
-          <div class="filter-group">
-            <label>所属项目</label>
-            <select v-model="filterProjectId" @change="onProjectChange">
-              <option value="">全部项目</option>
-              <option v-for="project in projects" :key="project.id" :value="project.id">
-                {{ project.name }}
-              </option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label>所属科目</label>
-            <select v-model="filterSubjectId" :disabled="!filterProjectId && !props.subjectId">
-              <option value="">{{ filterProjectId || props.subjectId ? '全部科目' : '请先选择项目' }}</option>
-              <option v-for="subject in filteredSubjects" :key="subject.id" :value="subject.id">
-                {{ subject.name }}
-              </option>
-            </select>
-          </div>
+      <!-- 项目和科目信息(只读) -->
+      <div class="info-bar">
+        <div class="info-item">
+          <span class="info-icon">📁</span>
+          <span class="info-label">项目:</span>
+          <span class="info-value">{{ currentProjectName }}</span>
+        </div>
+        <div class="info-divider">|</div>
+        <div class="info-item">
+          <span class="info-icon">📚</span>
+          <span class="info-label">科目:</span>
+          <span class="info-value">{{ currentSubjectName }}</span>
         </div>
       </div>
 
-      <!-- 搜索框 -->
-      <div class="search-box">
-        <input
-          v-model="searchKeyword"
-          type="text"
-          placeholder="搜索知识点名称..."
-          class="search-input"
-        />
-      </div>
+      <!-- 主内容区: 左右分栏 -->
+      <div class="content-panel">
+        <!-- 左侧: 章节树形菜单 -->
+        <div class="chapter-tree-panel">
+          <div class="panel-header">
+            <span class="panel-title">章节筛选</span>
+            <button class="btn-clear-filter" @click="clearChapterSelection">清空</button>
+          </div>
+          <div class="tree-container">
+            <div v-for="chapter in chapters" :key="chapter.id" class="tree-node chapter-node">
+              <!-- 章节复选框 -->
+              <div class="tree-item">
+                <input
+                  type="checkbox"
+                  :id="`chapter-${chapter.id}`"
+                  :value="chapter.id"
+                  :checked="selectedChapterIds.includes(chapter.id)"
+                  @change="toggleChapterSelection(chapter.id)"
+                />
+                <span
+                  v-if="chapter.sections && chapter.sections.length > 0"
+                  class="expand-icon"
+                  @click="toggleExpand(chapter.id)"
+                >
+                  {{ expandedChapters.includes(chapter.id) ? '▼' : '▶' }}
+                </span>
+                <label :for="`chapter-${chapter.id}`">{{ chapter.name }}</label>
+              </div>
 
-      <!-- 知识点列表 -->
-      <div class="knowledge-point-list">
-        <template v-if="filteredKnowledgePoints.length > 0">
-          <div
-            v-for="group in groupedKnowledgePoints"
-            :key="group.subjectId"
-            class="subject-group"
-          >
-            <div class="subject-header">
-              <span class="subject-name">{{ group.subjectName }}</span>
-              <span class="subject-count">({{ group.knowledgePoints.length }})</span>
-            </div>
-            <div class="knowledge-point-items">
+              <!-- 小节列表(展开时显示) -->
               <div
-                v-for="kp in group.knowledgePoints"
+                v-if="expandedChapters.includes(chapter.id) && chapter.sections && chapter.sections.length > 0"
+                class="tree-children"
+              >
+                <div v-for="section in chapter.sections" :key="section.id" class="tree-node section-node">
+                  <div class="tree-item">
+                    <input
+                      type="checkbox"
+                      :id="`section-${section.id}`"
+                      :value="section.id"
+                      :checked="selectedChapterIds.includes(section.id)"
+                      @change="toggleChapterSelection(section.id)"
+                    />
+                    <label :for="`section-${section.id}`">{{ section.name }}</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧: 知识点列表 -->
+        <div class="knowledge-point-panel">
+          <div class="panel-header">
+            <span class="panel-title">知识点列表 ({{ filteredKnowledgePoints.length }})</span>
+            <input
+              v-model="searchKeyword"
+              type="text"
+              placeholder="搜索知识点..."
+              class="search-input-inline"
+            />
+          </div>
+
+          <div class="knowledge-point-list">
+            <!-- 知识点项(扁平列表,不分组) -->
+            <template v-if="filteredKnowledgePoints.length > 0">
+              <div
+                v-for="kp in filteredKnowledgePoints"
                 :key="kp.id"
                 class="knowledge-point-item"
                 :class="{ 'is-selected': localSelectedIds.includes(kp.id) }"
                 @click="toggleSelection(kp.id)"
               >
                 <input
-                  :id="`kp-${kp.id}`"
                   type="checkbox"
+                  :id="`kp-${kp.id}`"
                   :checked="localSelectedIds.includes(kp.id)"
                   @click.stop="toggleSelection(kp.id)"
                 />
                 <label :for="`kp-${kp.id}`">{{ kp.name }}</label>
               </div>
+            </template>
+
+            <!-- 空状态 -->
+            <div v-else class="empty-state">
+              <p>{{ searchKeyword ? '未找到匹配的知识点' : (selectedChapterIds.length > 0 ? '所选章节下暂无知识点' : '当前科目下暂无知识点数据') }}</p>
             </div>
           </div>
-        </template>
-        <div v-else class="empty-state">
-          <p>{{ searchKeyword ? '未找到匹配的知识点' : '该科目下暂无知识点' }}</p>
         </div>
       </div>
 
@@ -107,18 +143,19 @@
 import { ref, computed, watch } from 'vue'
 import { useKnowledgePointStore } from '@/stores/knowledgePoint'
 import { useProjectStore } from '@/stores/project'
+import { useChapterStore } from '@/stores/chapter'
 import BaseModal from '@/components/Modal/BaseModal.vue'
 import type { KnowledgePoint } from '@/views/knowledge-point-management/types'
 
 // Props
 interface Props {
   visible: boolean
-  subjectId?: string // 当前选中的科目ID (可选, 用于过滤)
+  projectId: string // 锁定的项目ID (必填)
+  subjectId: string // 锁定的科目ID (必填)
   selectedIds?: string[] // 已选中的知识点ID列表
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  subjectId: '',
   selectedIds: () => []
 })
 
@@ -130,65 +167,84 @@ const emit = defineEmits<{
 
 const knowledgePointStore = useKnowledgePointStore()
 const projectStore = useProjectStore()
+const chapterStore = useChapterStore()
 
 // 本地状态
 const isVisible = ref(props.visible)
 const searchKeyword = ref('')
 const localSelectedIds = ref<string[]>([...props.selectedIds])
-const filterProjectId = ref('')
-const filterSubjectId = ref('')
+const selectedChapterIds = ref<string[]>([]) // 选中的章节/小节ID
+const expandedChapters = ref<string[]>([]) // 展开的章节ID
 
-// 项目列表
-const projects = computed(() => projectStore.projects)
+// 当前项目名称
+const currentProjectName = computed(() => {
+  const project = projectStore.projects.find(p => p.id === props.projectId)
+  return project?.name || '未知项目'
+})
 
-/**
- * 根据选中的项目过滤科目
- */
-const filteredSubjects = computed(() => {
-  if (filterProjectId.value) {
-    return projectStore.subjects.filter(s => s.projectId === filterProjectId.value)
-  }
-  if (props.subjectId) {
-    const subject = projectStore.subjects.find(s => s.id === props.subjectId)
-    if (subject) {
-      return projectStore.subjects.filter(s => s.projectId === subject.projectId)
-    }
-  }
-  return projectStore.subjects
+// 当前科目名称
+const currentSubjectName = computed(() => {
+  const subject = projectStore.subjects.find(s => s.id === props.subjectId)
+  return subject?.name || '未知科目'
 })
 
 /**
- * 项目切换事件
+ * 当前科目下的章节列表(包含小节)
  */
-const onProjectChange = () => {
-  filterSubjectId.value = ''
+const chapters = computed(() => {
+  const chapterList = chapterStore.chapters.filter(c => c.subjectId === props.subjectId)
+  return chapterList.map(chapter => ({
+    ...chapter,
+    sections: chapterStore.sections.filter(s => s.chapterId === chapter.id)
+  }))
+})
+
+/**
+ * 切换章节/小节选择
+ */
+const toggleChapterSelection = (id: string) => {
+  const index = selectedChapterIds.value.indexOf(id)
+  if (index > -1) {
+    selectedChapterIds.value.splice(index, 1)
+  } else {
+    selectedChapterIds.value.push(id)
+  }
 }
 
 /**
- * 获取所有知识点 (按科目过滤)
+ * 切换章节展开/收起
+ */
+const toggleExpand = (chapterId: string) => {
+  const index = expandedChapters.value.indexOf(chapterId)
+  if (index > -1) {
+    expandedChapters.value.splice(index, 1)
+  } else {
+    expandedChapters.value.push(chapterId)
+  }
+}
+
+/**
+ * 清空章节筛选
+ */
+const clearChapterSelection = () => {
+  selectedChapterIds.value = []
+}
+
+/**
+ * 获取当前科目下的所有知识点,并根据选中的章节筛选
  */
 const allKnowledgePoints = computed(() => {
-  const allKps = knowledgePointStore.knowledgePoints
+  // 获取当前科目的所有知识点
+  let kps = knowledgePointStore.knowledgePoints.filter((kp: KnowledgePoint) => kp.subjectId === props.subjectId)
 
-  // 优先使用用户选择的科目筛选
-  if (filterSubjectId.value) {
-    return allKps.filter((kp: KnowledgePoint) => kp.subjectId === filterSubjectId.value)
+  // 如果选中了章节,只显示这些章节的知识点
+  if (selectedChapterIds.value.length > 0) {
+    kps = kps.filter((kp: KnowledgePoint) =>
+      kp.chapterIds?.some(cId => selectedChapterIds.value.includes(cId))
+    )
   }
 
-  // 如果用户选择了项目但没有选择科目，显示该项目下所有科目的知识点
-  if (filterProjectId.value) {
-    const projectSubjectIds = projectStore.subjects
-      .filter(s => s.projectId === filterProjectId.value)
-      .map(s => s.id)
-    return allKps.filter((kp: KnowledgePoint) => projectSubjectIds.includes(kp.subjectId))
-  }
-
-  // 如果传入了默认的 subjectId，使用它作为初始筛选
-  if (props.subjectId && !filterProjectId.value && !filterSubjectId.value) {
-    return allKps.filter((kp: KnowledgePoint) => kp.subjectId === props.subjectId)
-  }
-
-  return allKps
+  return kps
 })
 
 /**
@@ -236,18 +292,10 @@ watch(
       // 重置本地状态
       searchKeyword.value = ''
       localSelectedIds.value = [...props.selectedIds]
+      selectedChapterIds.value = [] // 清空章节筛选
 
-      // 根据传入的 subjectId 设置初始筛选条件
-      if (props.subjectId) {
-        filterSubjectId.value = props.subjectId
-        const subject = projectStore.subjects.find(s => s.id === props.subjectId)
-        if (subject) {
-          filterProjectId.value = subject.projectId
-        }
-      } else {
-        filterProjectId.value = ''
-        filterSubjectId.value = ''
-      }
+      // 默认展开所有章节
+      expandedChapters.value = chapters.value.map(c => c.id)
     }
   }
 )
@@ -316,128 +364,259 @@ const handleClose = () => {
   gap: 16px;
 }
 
-.filter-section {
-  padding: 12px 16px;
-  background: linear-gradient(180deg, #fafcfe 0%, #f0f4f8 100%);
+/* 只读信息条 */
+.info-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  background: #f5f7fa;
   border: 1px solid #e4eaf2;
   border-radius: 8px;
 }
 
-.filter-row {
+.info-item {
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: 8px;
 }
 
-.filter-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.info-icon {
+  font-size: 16px;
 }
 
-.filter-group label {
+.info-label {
   font-size: 13px;
+  font-weight: 600;
+  color: var(--secondary-text);
+}
+
+.info-value {
+  font-size: 14px;
   font-weight: 600;
   color: var(--primary-text);
 }
 
-.filter-group select {
-  padding: 8px 12px;
-  border: 1px solid #cdd5e0;
-  border-radius: 6px;
+.info-divider {
+  color: #cbd5e0;
   font-size: 14px;
+}
+
+/* 主内容区: 左右分栏布局 */
+.content-panel {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+  height: 500px;
+}
+
+/* 左侧: 章节树形面板 */
+.chapter-tree-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e4eaf2;
+  border-radius: 8px;
+  overflow: hidden;
   background: #ffffff;
-  transition: border-color 0.2s ease;
+}
+
+/* 右侧: 知识点列表面板 */
+.knowledge-point-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e4eaf2;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+/* 面板头部(紫色渐变) */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* 清空筛选按钮 */
+.btn-clear-filter {
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.filter-group select:focus {
+.btn-clear-filter:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* 内联搜索框 */
+.search-input-inline {
+  width: 200px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--primary-text);
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.search-input-inline:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+  background: #ffffff;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 
-.filter-group select:disabled {
-  background: #f5f5f5;
-  cursor: not-allowed;
+.search-input-inline::placeholder {
   color: #999;
 }
 
-.search-box {
+/* 树形容器 */
+.tree-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+/* 树节点 */
+.tree-node {
+  margin-bottom: 4px;
+}
+
+.tree-node.chapter-node {
   margin-bottom: 8px;
 }
 
-.search-input {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid #dfe3eb;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s ease;
+.tree-node.section-node {
+  margin-left: 24px;
 }
 
-.search-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+/* 树项 */
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-.knowledge-point-list {
-  max-height: 400px;
-  overflow-y: auto;
-  border: 1px solid #dfe3eb;
-  border-radius: 6px;
-  background: #f8f9fa;
+.tree-item:hover {
+  background-color: rgba(102, 126, 234, 0.06);
 }
 
-.subject-group {
-  border-bottom: 1px solid #e4eaf2;
+.tree-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.subject-group:last-child {
-  border-bottom: none;
-}
-
-.subject-header {
-  padding: 12px 16px;
-  background: linear-gradient(180deg, #fafcfe 0%, #f0f4f8 100%);
-  font-weight: 600;
+.tree-item label {
+  flex: 1;
+  cursor: pointer;
   font-size: 14px;
   color: var(--primary-text);
-  border-bottom: 1px solid #e4eaf2;
+  user-select: none;
 }
 
-.subject-count {
+.section-node .tree-item label {
+  font-size: 13px;
   color: var(--secondary-text);
-  font-weight: 400;
-  margin-left: 4px;
 }
 
-.knowledge-point-items {
+/* 展开/收起图标 */
+.expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  color: var(--secondary-text);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.expand-icon:hover {
+  color: var(--accent);
+}
+
+/* 树子节点容器 */
+.tree-children {
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 知识点列表容器 */
+.knowledge-point-list {
+  flex: 1;
+  overflow-y: auto;
   padding: 8px 12px;
-  background: #ffffff;
+  background: #fafbfc;
 }
 
+/* 知识点单项 */
 .knowledge-point-item {
   display: flex;
   align-items: center;
-  padding: 10px 8px;
-  border-radius: 4px;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #e4eaf2;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .knowledge-point-item:hover {
-  background-color: rgba(0, 102, 204, 0.05);
+  border-color: #667eea;
+  background-color: rgba(102, 126, 234, 0.04);
+  transform: translateX(2px);
 }
 
 .knowledge-point-item.is-selected {
-  background-color: rgba(0, 102, 204, 0.1);
+  background-color: rgba(102, 126, 234, 0.1);
+  border-color: #667eea;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.1);
 }
 
 .knowledge-point-item input[type="checkbox"] {
-  margin-right: 10px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .knowledge-point-item label {
@@ -446,17 +625,28 @@ const handleClose = () => {
   cursor: pointer;
   color: var(--primary-text);
   font-size: 14px;
+  user-select: none;
 }
 
+.knowledge-point-item.is-selected label {
+  font-weight: 600;
+  color: #667eea;
+}
+
+/* 空状态 */
 .empty-state {
-  padding: 40px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   text-align: center;
-  color: #999;
+  color: var(--secondary-text);
 }
 
 .empty-state p {
   margin: 0;
   font-size: 14px;
+  color: #999;
 }
 
 .selected-section {

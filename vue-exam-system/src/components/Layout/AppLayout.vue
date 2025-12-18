@@ -31,7 +31,7 @@ defineProps<Props>()
 
 .content {
   flex: 1;
-  padding: 32px 48px;
+  padding: 32px 20px;
   display: flex;
   flex-direction: column;
   gap: 24px;

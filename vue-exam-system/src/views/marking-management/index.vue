@@ -7,7 +7,7 @@
           <div class="content-layout">
             <!-- 左侧: 项目科目树 -->
             <div class="left-sidebar">
-              <ProjectSubjectTree @select="handleTreeSelect" />
+              <SubjectTree @select="handleTreeSelect" />
             </div>
 
             <!-- 右侧: 筛选器 + 表格 + 分页 -->
@@ -496,7 +496,7 @@
 import { ref, computed, watch } from 'vue'
 import AppLayout from '@/components/Layout/AppLayout.vue'
 import TabNavigation from '@/components/Tab/TabNavigation.vue'
-import ProjectSubjectTree from './components/ProjectSubjectTree.vue'
+import SubjectTree from './components/SubjectTree.vue'
 import MarkingFilter from './components/MarkingFilter.vue'
 import MarkingTable from './components/MarkingTable.vue'
 import AssignTaskModal from './components/AssignTaskModal.vue'

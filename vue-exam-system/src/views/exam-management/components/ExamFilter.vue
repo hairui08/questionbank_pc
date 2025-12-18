@@ -1,6 +1,7 @@
 <template>
   <div class="exam-filter-panel">
     <div class="filter-row">
+      <!-- 1. 试卷状态 -->
       <div class="filter-item">
         <label>试卷状态</label>
         <select v-model="filterData.status">
@@ -10,20 +11,18 @@
         </select>
       </div>
 
-      <div class="filter-item">
-        <label>学习阶段</label>
-        <select v-model="filterData.learningStageId">
-          <option value="">全部</option>
-          <option
-            v-for="stage in availableStages"
-            :key="stage.id"
-            :value="stage.id"
-          >
-            {{ stage.name }}
-          </option>
-        </select>
+      <!-- 2. 试卷名称 -->
+      <div class="filter-item filter-item-search">
+        <label>试卷名称</label>
+        <input
+          v-model="filterData.examName"
+          type="text"
+          placeholder="请输入试卷名称"
+          @keyup.enter="handleSearch"
+        />
       </div>
 
+      <!-- 3. 创建时间 -->
       <div class="filter-item">
         <label>创建时间</label>
         <div class="date-range-wrapper">
@@ -41,16 +40,6 @@
         </div>
       </div>
 
-      <div class="filter-item filter-item-search">
-        <label>试卷名称</label>
-        <input
-          v-model="filterData.examName"
-          type="text"
-          placeholder="请输入试卷名称"
-          @keyup.enter="handleSearch"
-        />
-      </div>
-
       <div class="filter-actions">
         <button class="btn primary" @click="handleSearch">
           🔍 搜索
@@ -64,13 +53,11 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch, computed } from 'vue'
-import { useLearningStageStore } from '@/stores/learningStage'
+import { reactive, watch } from 'vue'
 import type { ExamFilter } from '../types'
 
 interface Props {
   modelValue: ExamFilter
-  activeSubjectId?: string
 }
 
 interface Emits {
@@ -82,18 +69,7 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-// 初始化stores
-const learningStageStore = useLearningStageStore()
-
 const filterData = reactive<ExamFilter>({ ...props.modelValue })
-
-// 获取当前科目的学习阶段列表（启用状态，按排序升序）
-const availableStages = computed(() => {
-  if (!props.activeSubjectId) return []
-  return learningStageStore.learningStages
-    .filter(s => s.subjectId === props.activeSubjectId && s.status === 'active')
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-})
 
 // 监听父组件传入的筛选条件变化
 watch(() => props.modelValue, (newVal) => {

@@ -185,71 +185,45 @@
             </template>
 
             <!-- 练习设置弹窗 -->
-            <BaseModal
-              v-model:visible="showSettingsModal"
-              title="错题练习设置"
-              width="480px"
-              @confirm="applySettings"
-            >
-              <div class="settings-content">
-                <!-- 题目数量设置 -->
-                <div class="setting-group">
-                  <label class="setting-label">练习题目数量</label>
-                  <div class="radio-group">
-                    <label class="radio-item">
-                      <input type="radio" v-model="practiceSettings.count" value="10" name="count" />
-                      <span>10题</span>
-                    </label>
-                    <label class="radio-item">
-                      <input type="radio" v-model="practiceSettings.count" value="20" name="count" />
-                      <span>20题</span>
-                    </label>
-                    <label class="radio-item">
-                      <input type="radio" v-model="practiceSettings.count" value="50" name="count" />
-                      <span>50题</span>
-                    </label>
-                    <label class="radio-item">
-                      <input type="radio" v-model="practiceSettings.count" value="all" name="count" />
-                      <span>全部 ({{ filteredQuestions.length }}题)</span>
-                    </label>
-                  </div>
+            <transition name="modal-fade-scale">
+              <BaseModal
+                v-model:visible="showSettingsModal"
+                class="practice-settings-modal"
+                title="错题练习设置"
+                width="480px"
+                @confirm="applySettings"
+              >
+                <div class="settings-content">
+                    <label class="setting-label">答对次数要求</label>
+                    <div class="radio-group">
+                      <label class="radio-item">
+                        <input type="radio" v-model="practiceSettings.removeAfter" value="none" name="removeAfter" />
+                        <span>不移除</span>
+                      </label>
+                      <label class="radio-item">
+                        <input type="radio" v-model="practiceSettings.removeAfter" value="1" name="removeAfter" />
+                        <span>答对 1 次后移除</span>
+                      </label>
+                      <label class="radio-item">
+                        <input type="radio" v-model="practiceSettings.removeAfter" value="2" name="removeAfter" />
+                        <span>答对 2 次后移除</span>
+                      </label>
+                      <label class="radio-item">
+                        <input type="radio" v-model="practiceSettings.removeAfter" value="3" name="removeAfter" />
+                        <span>答对 3 次后移除</span>
+                      </label>
+                      <label class="radio-item">
+                        <input type="radio" v-model="practiceSettings.removeAfter" value="4" name="removeAfter" />
+                        <span>答对 4 次后移除</span>
+                      </label>
+                      <label class="radio-item">
+                        <input type="radio" v-model="practiceSettings.removeAfter" value="5" name="removeAfter" />
+                        <span>答对 5 次后移除</span>
+                      </label>
+                    </div>
                 </div>
-
-                <!-- 移出规则设置 -->
-                <div class="setting-group">
-                  <label class="setting-label">答对后自动移出错题本</label>
-                  <div class="switch-group">
-                    <label class="switch-item">
-                      <input type="checkbox" v-model="practiceSettings.autoRemove" />
-                      <span class="switch-box"></span>
-                      <span class="switch-text">启用自动移出</span>
-                    </label>
-                  </div>
-                  <p class="setting-hint" v-if="practiceSettings.autoRemove">
-                    开启后,练习中答对的题目将自动从错题本移除
-                  </p>
-                </div>
-
-                <!-- 答对次数设置(仅在启用自动移出时显示) -->
-                <div class="setting-group" v-if="practiceSettings.autoRemove">
-                  <label class="setting-label">答对次数要求</label>
-                  <div class="radio-group">
-                    <label class="radio-item">
-                      <input type="radio" v-model="practiceSettings.removeAfter" value="1" name="removeAfter" />
-                      <span>答对 1 次即移出</span>
-                    </label>
-                    <label class="radio-item">
-                      <input type="radio" v-model="practiceSettings.removeAfter" value="2" name="removeAfter" />
-                      <span>答对 2 次后移出</span>
-                    </label>
-                    <label class="radio-item">
-                      <input type="radio" v-model="practiceSettings.removeAfter" value="3" name="removeAfter" />
-                      <span>答对 3 次后移出</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </BaseModal>
+              </BaseModal>
+            </transition>
           </div>
         </template>
 
@@ -286,7 +260,7 @@
               </div>
             </section>
 
-            <!-- 2. 核心功能规格 -->
+            <!-- 2. 核心功能规格（更新） -->
             <section class="req-section">
               <h3 class="req-section-title">2. 核心功能规格</h3>
               <div class="table-card">
@@ -326,13 +300,23 @@
                       <td>P0</td>
                     </tr>
                     <tr>
-                      <td>分页</td>
-                      <td>每页10条，支持10/20/50条选项</td>
+                      <td>练习设置弹窗</td>
+                      <td>仅包含“答对次数要求”，选项为：不移除、1次、2次、3次、4次、5次、6次；默认“不移除”</td>
                       <td>P0</td>
                     </tr>
                     <tr>
-                      <td>空状态</td>
-                      <td>无错题时显示提示“暂无错题，继续加油！”</td>
+                      <td>次数设置布局</td>
+                      <td>“答对次数要求”单选项以两列网格布局排列；选中态为整块高亮，隐藏原生单选控件</td>
+                      <td>P1</td>
+                    </tr>
+                    <tr>
+                      <td>动效与视觉</td>
+                      <td>弹窗淡入缩放动画；设置内容卡片化（圆角、阴影、内边距）；主色系红色渐变</td>
+                      <td>P1</td>
+                    </tr>
+                    <tr>
+                      <td>响应式</td>
+                      <td>移动端（≤768px）优化：单选项间距与内边距缩减；必要时降为单列</td>
                       <td>P1</td>
                     </tr>
                   </tbody>
@@ -340,9 +324,72 @@
               </div>
             </section>
 
-            <!-- 3. 验收标准 -->
+            <!-- 3. 交互细节 -->
             <section class="req-section">
-              <h3 class="req-section-title">3. 验收标准</h3>
+              <h3 class="req-section-title">3. 交互细节</h3>
+              <div class="table-card">
+                <div class="table-header header-gradient">交互规范</div>
+                <table class="req-table">
+                  <thead>
+                    <tr>
+                      <th>交互点</th>
+                      <th>说明</th>
+                      <th>优先级</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>设置默认值</td>
+                      <td>进入弹窗时，默认选择“不移除”</td>
+                      <td>P0</td>
+                    </tr>
+                    <tr>
+                      <td>选中态</td>
+                      <td>整块选项高亮（背景渐变 + 文案白色），不再仅高亮文字</td>
+                      <td>P0</td>
+                    </tr>
+                    <tr>
+                      <td>关闭与确认</td>
+                      <td>点击确认应用设置；关闭不改变当前策略</td>
+                      <td>P0</td>
+                    </tr>
+                    <tr>
+                      <td>可访问性</td>
+                      <td>选项可通过键盘导航与回车触发；保证焦点可见</td>
+                      <td>P1</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- 4. 数据结构与参数 -->
+            <section class="req-section">
+              <h3 class="req-section-title">4. 数据结构与参数</h3>
+              <div class="table-card">
+                <div class="table-header header-primary">设置参数</div>
+                <table class="req-table">
+                  <thead>
+                    <tr>
+                      <th>字段</th>
+                      <th>类型</th>
+                      <th>说明</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>practiceSettings.removeAfter</td>
+                      <td>enum: 'none' | '1' | '2' | '3' | '4' | '5' | '6'</td>
+                      <td>答对次数后移除策略；'none' 表示不移除</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- 5. 验收标准（更新） -->
+            <section class="req-section">
+              <h3 class="req-section-title">5. 验收标准</h3>
               <div class="table-card">
                 <div class="table-header header-danger">验收标准</div>
                 <table class="req-table checklist-table">
@@ -366,32 +413,22 @@
                     </tr>
                     <tr>
                       <td>P0</td>
-                      <td>卡片展示：题干（≤100字）、时间、来源信息</td>
+                      <td>练习设置：仅保留“答对次数要求”，默认“不移除”，选项含 1–6 次</td>
                       <td><span class="status-ok">✔</span></td>
                     </tr>
                     <tr>
                       <td>P0</td>
-                      <td>工具栏：显示“全部错题练习”按钮与数量</td>
+                      <td>两列布局：设置项两列排布，移动端可降为一列</td>
                       <td><span class="status-ok">✔</span></td>
                     </tr>
                     <tr>
                       <td>P0</td>
-                      <td>单题重做：从该题开始顺序练习后续错题</td>
-                      <td><span class="status-ok">✔</span></td>
-                    </tr>
-                    <tr>
-                      <td>P0</td>
-                      <td>分页：筛选变更重置第1页，交互正常</td>
+                      <td>选中态：整块高亮，隐藏原生单选圆点</td>
                       <td><span class="status-ok">✔</span></td>
                     </tr>
                     <tr>
                       <td>P1</td>
-                      <td>空状态：无错题时显示友好提示</td>
-                      <td><span class="status-ok">✔</span></td>
-                    </tr>
-                    <tr>
-                      <td>P1</td>
-                      <td>响应式：移动端（≤768px）卡片垂直排列</td>
+                      <td>动效：弹窗淡入缩放动画；视觉卡片化</td>
                       <td><span class="status-ok">✔</span></td>
                     </tr>
                   </tbody>
@@ -553,7 +590,7 @@ const filters: FilterChip[] = [
   { id: 'chapter', label: '章节分类' },
   { id: 'type', label: '题型分类' },
 ]
-const activeFilterId = ref<FilterChip['id']>('type')
+const activeFilterId = ref<FilterChip['id']>('chapter')
 const isChapterFilter = computed(() => activeFilterId.value === 'chapter')
 const isTypeFilter = computed(() => activeFilterId.value === 'type')
 function selectFilter(id: FilterChip['id']) {
@@ -577,15 +614,11 @@ const showSettingsModal = ref(false)
 
 // 练习设置
 interface PracticeSettings {
-  count: '10' | '20' | '50' | 'all'
-  autoRemove: boolean
-  removeAfter: '1' | '2' | '3'
+  removeAfter: 'none' | '1' | '2' | '3' | '4' | '5' | '6'
 }
 
 const practiceSettings = ref<PracticeSettings>({
-  count: 'all',
-  autoRemove: false,
-  removeAfter: '1'
+  removeAfter: 'none'
 })
 
 // 项目和科目选项
@@ -899,6 +932,10 @@ function loadPracticeSettings() {
       console.error('加载练习设置失败:', e)
     }
   }
+  // 默认“答对次数要求”为不移除
+  if (!practiceSettings.value.removeAfter) {
+    practiceSettings.value.removeAfter = 'none'
+  }
 }
 
 function applySettings() {
@@ -955,15 +992,7 @@ function handlePracticeAll() {
   }
 
   // 获取所有错题的 questionId
-  let questionIds = filteredQuestions.value.map(q => q.questionId)
-
-  // 应用题目数量限制
-  if (practiceSettings.value.count !== 'all') {
-    const count = parseInt(practiceSettings.value.count)
-    if (questionIds.length > count) {
-      questionIds = questionIds.slice(0, count)
-    }
-  }
+  const questionIds = filteredQuestions.value.map(q => q.questionId)
 
   // 获取科目名称
   const subjectName = subjectOptions.value.find(s => s.id === activeSubjectId.value)?.name || '未知科目'
@@ -978,7 +1007,7 @@ function handlePracticeAll() {
 
   if (success) {
     // 保存练习设置到 sessionStorage(供答题页面使用)
-    if (practiceSettings.value.autoRemove) {
+    if (practiceSettings.value.removeAfter !== 'none') {
       sessionStorage.setItem('wrongQuestionAutoRemove', JSON.stringify({
         enabled: true,
         removeAfter: parseInt(practiceSettings.value.removeAfter)
@@ -1196,7 +1225,7 @@ onUnmounted(() => {
 }
 
 .tab-content {
-  padding: 32px 0 0;
+  padding: 26px 0 11px;
 }
 
 /* 页面标题 */
@@ -1853,4 +1882,160 @@ onUnmounted(() => {
   }
   .sg-table tbody tr:hover td { background: #fafafa; }
   .sg-table tbody tr:last-child td { border-bottom: none; }
+/* 入场/离场动画（淡入 + 轻微缩放） */
+:deep(.modal-fade-scale-enter-active),
+:deep(.modal-fade-scale-leave-active) {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+:deep(.modal-fade-scale-enter-from),
+:deep(.modal-fade-scale-leave-to) {
+  opacity: 0;
+  transform: translate3d(0, -2px, 0) scale(0.98);
+}
+
+/* 弹窗内部内容卡片化 */
+.settings-content {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.08);
+}
+
+/* 组间距与标题 */
+.setting-group + .setting-group {
+  margin-top: 18px;
+}
+.setting-label {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+/* 单选组：两列栅格布局，选中态更显眼 */
+.radio-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.radio-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  width: 100%;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 12px;
+  background: #f7f7f7;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.14s ease;
+}
+.radio-item:hover {
+  border-color: rgba(255, 82, 82, 0.55);
+  background: #fff;
+}
+
+/* 隐藏原生单选框 */
+.radio-item input {
+  display: none;
+}
+
+/* 默认文字样式 */
+.radio-item span {
+  color: #333;
+}
+
+/* 选中态：整块 radio-item 高亮背景 + 文字改为白色 */
+.radio-item:has(input:checked) {
+  border-color: rgba(255, 82, 82, 0.6);
+  background: linear-gradient(135deg, #ff6565, #ff2d2d);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(255,45,45,0.22);
+}
+.radio-item:has(input:checked) span {
+  color: #fff;
+}
+
+/* 覆盖旧的 span 选中样式，选中时只让整块变色 */
+.radio-item input:checked + span {
+  color: inherit;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* 开关组样式优化 */
+.switch-group {
+  display: flex;
+  align-items: center;
+}
+.switch-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.switch-item input {
+  display: none;
+}
+.switch-box {
+  width: 48px;
+  height: 28px;
+  border-radius: 28px;
+  background: #ddd;
+  position: relative;
+  transition: background 0.12s ease;
+}
+.switch-box::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: left 0.12s ease;
+}
+.switch-item input:checked + .switch-box {
+  background: linear-gradient(135deg, #ff6565, #ff2d2d);
+}
+.switch-item input:checked + .switch-box::after {
+  left: 23px;
+}
+.switch-text {
+  font-size: 13px;
+  color: #555;
+}
+
+/* 提示文案 */
+.setting-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #888;
+}
+
+/* 小屏优化 */
+@media (max-width: 520px) {
+  .settings-content {
+    padding: 12px 14px;
+    border-radius: 14px;
+  }
+  .radio-item {
+    padding: 6px 10px;
+  }
+}
+/* 交互细节表头：红色渐变 + 白色文字 */
+.table-header.header-gradient {
+  background: linear-gradient(135deg, #5b4dbb 0%, #7c5cff 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 6px 16px rgba(255, 45, 45, 0.22);
+}
 </style>

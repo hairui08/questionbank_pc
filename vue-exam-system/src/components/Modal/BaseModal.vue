@@ -6,7 +6,7 @@
       :class="{ 'is-open': visible }"
       @click="handleBackdropClick"
     >
-      <div class="modal" :style="{ width: width || '480px' }" @click.stop>
+      <div class="modal" :style="{ width: width || '460px' }" @click.stop>
         <header v-if="$slots.header || title">
           <slot name="header">
             <h3>{{ title }}</h3>
@@ -85,7 +85,7 @@ const handleConfirm = () => {
 }
 
 .modal {
-  width: 480px;
+  width: 410px;
   max-width: 100%;
   background: #ffffff;
   border-radius: 16px;
@@ -97,7 +97,7 @@ const handleConfirm = () => {
 }
 
 .modal header {
-  padding: 24px;
+  padding: 18px 16px;
   border-bottom: 1px solid #e5e8ef;
 }
 
@@ -113,9 +113,7 @@ const handleConfirm = () => {
 }
 
 .modal-body {
-  padding: 24px;
-  max-height: 500px;
-  overflow-y: auto;
+  overflow:hidden;
 }
 
 .modal footer {

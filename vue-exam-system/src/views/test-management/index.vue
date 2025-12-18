@@ -6,84 +6,96 @@
         <div class="tab-panel">
           <div class="prototype-wrapper">
             <div class="test-management-container">
-              <!-- 筛选器 -->
-              <TestFilter
-                v-model="filter"
-                @search="handleSearch"
-                @reset="handleReset"
-              />
-
-              <!-- 操作按钮区 -->
-              <div class="action-bar">
-                <div class="action-left">
-                  <button class="btn primary" @click="handleCreate">
-                    ➕ 创建考试
-                  </button>
-                  <button
-                    class="btn danger"
-                    :disabled="selectedIds.length === 0"
-                    @click="handleBatchDelete"
-                  >
-                    🗑️ 批量删除
-                  </button>
-                </div>
-                <div class="action-right">
-                  <span class="selection-count">
-                    已选中 {{ selectedIds.length }} 项
-                  </span>
-                </div>
+              <!-- 左侧树形导航 -->
+              <div class="tree-panel">
+                <SubjectTree
+                  @subject-change="handleSubjectChange"
+                  @project-change="handleProjectChange"
+                  @stage-change="handleStageChange"
+                />
               </div>
+              
+              <!-- 右侧内容区 -->
+              <div class="content-panel">
+                <!-- 筛选器 -->
+                <TestFilter
+                  v-model="filter"
+                  @search="handleSearch"
+                  @reset="handleReset"
+                />
 
-              <!-- 考试表格 -->
-              <TestTable
-                :tests="paginatedData.data"
-                v-model:selectedIds="selectedIds"
-                @preview="handlePreview"
-                @edit="handleEdit"
-                @review="handleReview"
-                @delete="handleDeleteSingle"
-              />
-
-              <!-- 分页器 -->
-              <div v-if="paginatedData.total > 0" class="pagination">
-                <div class="pagination-info">
-                  共 {{ paginatedData.total }} 条记录,第 {{ paginatedData.currentPage }} / {{ paginatedData.totalPages }} 页
-                </div>
-                <div class="pagination-controls">
-                  <button
-                    class="pagination-btn"
-                    :disabled="paginatedData.currentPage === 1"
-                    @click="goToPage(paginatedData.currentPage - 1)"
-                  >
-                    上一页
-                  </button>
-                  <div class="page-numbers">
+                <!-- 操作按钮区 -->
+                <div class="action-bar">
+                  <div class="action-left">
+                    <button class="btn primary" @click="handleCreate">
+                      ➕ 创建考试
+                    </button>
                     <button
-                      v-for="page in visiblePages"
-                      :key="page"
-                      class="page-number"
-                      :class="{ active: page === paginatedData.currentPage }"
-                      @click="goToPage(page)"
+                      class="btn danger"
+                      :disabled="selectedIds.length === 0"
+                      @click="handleBatchDelete"
                     >
-                      {{ page }}
+                      🗑️ 批量删除
                     </button>
                   </div>
-                  <button
-                    class="pagination-btn"
-                    :disabled="paginatedData.currentPage === paginatedData.totalPages"
-                    @click="goToPage(paginatedData.currentPage + 1)"
-                  >
-                    下一页
-                  </button>
+                  <div class="action-right">
+                    <span class="selection-count">
+                      已选中 {{ selectedIds.length }} 项
+                    </span>
+                  </div>
                 </div>
-                <div class="pagination-size">
-                  <label>每页显示</label>
-                  <select v-model.number="pageSize" @change="handlePageSizeChange">
-                    <option :value="10">10</option>
-                    <option :value="20">20</option>
-                    <option :value="50">50</option>
-                  </select>
-                  <span>条</span>
+
+                <!-- 考试表格 -->
+                <TestTable
+                  :tests="paginatedData.data"
+                  v-model:selectedIds="selectedIds"
+                  @preview="handlePreview"
+                  @edit="handleEdit"
+                  @review="handleReview"
+                  @delete="handleDeleteSingle"
+                />
+
+                <!-- 分页器 -->
+                <div v-if="paginatedData.total > 0" class="pagination">
+                  <div class="pagination-info">
+                    共 {{ paginatedData.total }} 条记录,第 {{ paginatedData.currentPage }} / {{ paginatedData.totalPages }} 页
+                  </div>
+                  <div class="pagination-controls">
+                    <button
+                      class="pagination-btn"
+                      :disabled="paginatedData.currentPage === 1"
+                      @click="goToPage(paginatedData.currentPage - 1)"
+                    >
+                      上一页
+                    </button>
+                    <div class="page-numbers">
+                      <button
+                        v-for="page in visiblePages"
+                        :key="page"
+                        class="page-number"
+                        :class="{ active: page === paginatedData.currentPage }"
+                        @click="goToPage(page)"
+                      >
+                        {{ page }}
+                      </button>
+                    </div>
+                    <button
+                      class="pagination-btn"
+                      :disabled="paginatedData.currentPage === paginatedData.totalPages"
+                      @click="goToPage(paginatedData.currentPage + 1)"
+                    >
+                      下一页
+                    </button>
+                  </div>
+                  <div class="pagination-size">
+                    <label>每页显示</label>
+                    <select v-model.number="pageSize" @change="handlePageSizeChange">
+                      <option :value="10">10</option>
+                      <option :value="20">20</option>
+                      <option :value="50">50</option>
+                    </select>
+                    <span>条</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -415,6 +427,7 @@ import TestFilter from './components/TestFilter.vue'
 import TestTable from './components/TestTable.vue'
 import DeleteConfirmModal from './components/DeleteConfirmModal.vue'
 import ReviewModal from './components/ReviewModal.vue'
+import SubjectTree from '@/views/test-management/components/SubjectTree.vue'
 import { useTestStore } from '@/stores/test'
 import { useToast } from '@/composables/useToast'
 import type { TestFilter as TestFilterType } from './types'
@@ -612,11 +625,28 @@ function goToPage(page: number) {
 function handlePageSizeChange() {
   currentPage.value = 1
 }
+
+// 处理项目选择
+function handleProjectChange(project: any) {
+  console.log('Selected project:', project)
+  // 这里可以根据项目过滤考试列表
+}
+
+// 处理科目选择
+function handleSubjectChange(subject: any) {
+  console.log('Selected subject:', subject)
+  // 这里可以根据科目过滤考试列表
+}
+
+// 处理学习阶段选择
+function handleStageChange(stage: any) {
+  console.log('Selected stage:', stage)
+  // 这里可以根据学习阶段过滤考试列表
+}
 </script>
 
 <style scoped>
 .tab-panel {
-  padding: 32px;
   animation: fade-in 0.3s ease;
 }
 
@@ -637,9 +667,23 @@ function handlePageSizeChange() {
 
 .test-management-container {
   display: flex;
-  flex-direction: column;
   gap: 20px;
   min-height: calc(100vh - 240px);
+}
+
+/* 左侧树形导航 */
+.tree-panel {
+  width: 280px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* 右侧内容区 */
+.content-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 /* 操作按钮区 */

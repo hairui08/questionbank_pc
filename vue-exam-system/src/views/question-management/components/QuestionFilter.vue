@@ -1,66 +1,34 @@
 <template>
   <div class="question-filter">
-    <div class="filter-row">
-      <div class="filter-group">
-        <label>所属项目</label>
-        <select v-model="localFilter.projectId" @change="onProjectChange">
-          <option value="">全部项目</option>
-          <option v-for="project in projects" :key="project.id" :value="project.id">
-            {{ project.name }}
-          </option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label>所属科目</label>
-        <select v-model="localFilter.subjectId" :disabled="!localFilter.projectId">
-          <option value="">{{ localFilter.projectId ? '全部科目' : '请先选择项目' }}</option>
-          <option v-for="subject in filteredSubjects" :key="subject.id" :value="subject.id">
-            {{ subject.name }}
-          </option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label>试题来源</label>
-        <select v-model="localFilter.source">
-          <option value="">全部来源</option>
-          <option value="official">历年真题</option>
-          <option value="simulation">模拟试题</option>
-          <option value="custom">自定义</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label>所属年份</label>
-        <select v-model="localFilter.year">
-          <option value="">全部年份</option>
-          <option value="2025">2025</option>
-          <option value="2024">2024</option>
-          <option value="2023">2023</option>
-          <option value="2022">2022</option>
-          <option value="2021">2021</option>
-        </select>
-      </div>
-
+    <!-- 第一行：题目搜索 + 项目 + 科目 + 章节 + 知识点 + 年份 -->
+    <div class="filter-row-main">
+      <!-- 4. 知识点（单选下拉框） -->
       <div class="filter-group">
         <label>知识点</label>
         <select v-model="localFilter.knowledgePointId" :disabled="!activeSubjectId">
-          <option value="">{{ activeSubjectId ? '全部知识点' : '请先选择科目' }}</option>
-          <option
-            v-for="kp in filteredKnowledgePoints"
-            :key="kp.id"
-            :value="kp.id"
-          >
+          <option value="">{{ activeSubjectId ? '请选择知识点' : '请先选择科目' }}</option>
+          <option v-for="kp in filteredKnowledgePoints" :key="kp.id" :value="kp.id">
             {{ kp.name }}
           </option>
         </select>
       </div>
 
+      <!-- 5. 所属年份 -->
+      <div class="filter-group">
+        <label>所属年份</label>
+        <select v-model="localFilter.year">
+          <option value="">请选择年份</option>
+          <option v-for="year in yearOptions" :key="year" :value="String(year)">
+            {{ year }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 6. 题型 -->
       <div class="filter-group">
         <label>题型</label>
         <select v-model="localFilter.type">
-          <option value="">全部题型</option>
+          <option value="">请选择题型</option>
           <option value="single">单选题</option>
           <option value="multiple">多选题</option>
           <option value="judgment">判断题</option>
@@ -69,33 +37,69 @@
         </select>
       </div>
 
+         <!-- 7. 试题频次 -->
       <div class="filter-group">
-        <label>试题难度</label>
-        <select v-model="localFilter.difficulty">
-          <option value="">全部难度</option>
-          <option value="easy">简单</option>
-          <option value="medium">中等</option>
-          <option value="hard">困难</option>
+        <label>试题频次</label>
+        <select v-model="localFilter.frequency">
+          <option value="">请选择频次</option>
+          <option value="low">低频</option>
+          <option value="medium">中频</option>
+          <option value="high">高频</option>
         </select>
       </div>
 
+       <!-- 8. 启用状态 -->
+      <div class="filter-group">
+        <label>启用状态</label>
+        <select v-model="localFilter.status">
+          <option value="">请选择状态</option>
+          <option value="active">启用</option>
+          <option value="disabled">禁用</option>
+          <option value="all">全部</option>
+        </select>
+      </div>
+
+      <!-- 0. 题目内容搜索 -->
+      <div class="filter-group search-group-inline">
+        <label>题目内容搜索</label>
+        <input
+          type="text"
+          v-model="localFilter.stemKeyword"
+          placeholder="请输入题干关键词"
+          class="search-input-inline"
+        />
+      </div>
+   
     </div>
 
-    <div class="filter-actions">
-      <button class="btn primary" @click="handleSearch">
-        搜索
-      </button>
-      <button class="btn secondary" @click="handleReset">
-        重置
-      </button>
+    
+
+    <!-- 第二行：题型 + 频次 + 状态 + 按钮 -->
+    <div class="filter-row-secondary">
+     
+      
+
+
+      <!-- 9. 操作按钮 -->
+      <div class="filter-actions-inline">
+        <button class="btn primary" @click="handleSearch">
+          搜索
+        </button>
+        <button class="btn secondary" @click="handleReset">
+          重置
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
+import { useChapterStore } from '@/stores/chapter'
 import { useKnowledgePointStore } from '@/stores/knowledgePoint'
+import CategoryTreeDropdown from './CategoryTreeDropdown.vue'
 import type { QuestionFilter } from '../types'
 
 interface Props {
@@ -111,24 +115,39 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
+const router = useRouter()
 const projectStore = useProjectStore()
+const chapterStore = useChapterStore()
 const knowledgePointStore = useKnowledgePointStore()
 
-const localFilter = ref<QuestionFilter>({ ...props.modelValue })
+const localFilter = ref<QuestionFilter>({ 
+  ...props.modelValue,
+  year: props.modelValue.year || '',
+  type: props.modelValue.type || '',
+  frequency: props.modelValue.frequency || '',
+  status: props.modelValue.status || 'all'
+})
 
 // 项目列表
 const projects = computed(() => {
-  return projectStore.projects
+  return chapterStore.projectTree
 })
 
 // 过滤的科目列表
 const filteredSubjects = computed(() => {
   if (!localFilter.value.projectId) return []
-  return projectStore.subjects.filter(s => s.projectId === localFilter.value.projectId)
+  const project = chapterStore.projectTree.find(p => p.id === localFilter.value.projectId)
+  return project ? project.subjects : []
 })
 
 // 当前选中的科目ID（用于启用/禁用知识点筛选）
 const activeSubjectId = computed(() => localFilter.value.subjectId || '')
+
+// 过滤的章节列表
+const filteredChapters = computed(() => {
+  if (!activeSubjectId.value) return []
+  return chapterStore.chapters.filter(c => c.subjectId === activeSubjectId.value)
+})
 
 // 过滤的知识点列表
 const filteredKnowledgePoints = computed(() => {
@@ -136,9 +155,27 @@ const filteredKnowledgePoints = computed(() => {
   return knowledgePointStore.knowledgePoints.filter(kp => kp.subjectId === activeSubjectId.value)
 })
 
+// 年份选项（动态计算：当前年份±5年）
+const yearOptions = computed(() => {
+  const currentYear = new Date().getFullYear()
+  const years: number[] = []
+  // 从当前年份+5到当前年份-5，降序排列
+  for (let year = currentYear + 5; year >= currentYear - 5; year--) {
+    years.push(year)
+  }
+  return years
+})
+
 // 监听 props 变化同步到本地
 watch(() => props.modelValue, (newVal) => {
-  localFilter.value = { ...newVal }
+  localFilter.value = {
+    ...newVal,
+    // 确保这些字段有默认值，防止select元素显示为未选中状态
+    year: newVal.year || '',
+    type: newVal.type || '',
+    frequency: newVal.frequency || '',
+    status: newVal.status || 'all'
+  }
 }, { deep: true })
 
 // 监听本地变化同步到父组件
@@ -151,6 +188,16 @@ watch(localFilter, (newVal) => {
  */
 function onProjectChange() {
   localFilter.value.subjectId = ''
+  localFilter.value.chapterId = ''
+  localFilter.value.knowledgePointId = ''
+}
+
+/**
+ * 科目切换事件
+ */
+function onSubjectChange() {
+  localFilter.value.chapterId = ''
+  localFilter.value.knowledgePointId = ''
 }
 
 function handleSearch() {
@@ -158,8 +205,17 @@ function handleSearch() {
 }
 
 function handleReset() {
-  localFilter.value = {}
+  localFilter.value = {
+    year: '',
+    type: '',
+    frequency: '',
+    status: ''
+  }
   emit('reset')
+}
+
+function handleManageCategory() {
+  router.push('/question-management/category')
 }
 </script>
 
@@ -168,15 +224,55 @@ function handleReset() {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.filter-row {
+/* 第一行布局 */
+.filter-row-main {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+/* 第二行布局 */
+.filter-row-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* 内联搜索框组 */
+.search-group-inline {
+  min-width: 150px;
+  max-width: 150px;
+}
+
+/* 内联搜索输入框 */
+.search-input-inline {
+  padding: 8px 12px;
+  border: 1px solid #cdd5e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.search-input-inline:hover:not(:disabled) {
+  border-color: #a8b3c1;
+}
+
+.search-input-inline:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.search-input-inline:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
 }
 
 .filter-group {
@@ -214,12 +310,27 @@ function handleReset() {
   cursor: not-allowed;
 }
 
-.filter-actions {
+.filter-actions-inline {
   display: flex;
   gap: 12px;
-  justify-content: flex-end;
-  padding-top: 16px;
-  border-top: 1px solid var(--panel-border);
+  align-items: flex-end;
+  flex: 0 0 auto;
+  min-width: 200px;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.filter-actions-inline .btn {
+  flex: 1;
+  min-width: 90px;
+}
+
+/* 响应式：小屏幕下按钮独占一行 */
+@media (max-width: 768px) {
+  .filter-actions-inline {
+    flex: 1 1 100%;
+    order: 999;
+  }
 }
 
 .btn {
@@ -250,5 +361,32 @@ function handleReset() {
 
 .btn.secondary:hover {
   background: #f5f5f5;
+}
+/* Enhanced hover effects for inputs */
+.search-input:hover:not(:disabled),
+.knowledge-point-search:hover:not(:disabled) {
+  border-color: #a8b3c1;
+}
+
+/* Enhanced hover effects for selects */
+.filter-group select:hover:not(:disabled) {
+  border-color: #a8b3c1;
+}
+
+/* Enhanced button hover with transform */
+.btn.primary:hover {
+  background: linear-gradient(180deg, #4b6ee6 0%, #264acc 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(47, 87, 227, 0.3);
+}
+
+.btn.secondary:hover {
+  background: #f5f5f5;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn:active {
+  transform: translateY(0);
 }
 </style>

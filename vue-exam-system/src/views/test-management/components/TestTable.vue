@@ -51,24 +51,11 @@
               {{ getReviewStatusLabel(test.status) }}
             </span>
           </td>
-          <td class="actions">
-            <button class="action-btn preview" @click="emit('preview', test.id)" title="预览">
-              👁️
-            </button>
-            <button class="action-btn edit" @click="emit('edit', test.id)" title="编辑">
-              ✏️
-            </button>
-            <button
-              class="action-btn review"
-              :disabled="test.status !== 'pending'"
-              @click="emit('review', test.id)"
-              title="审核"
-            >
-              ✅
-            </button>
-            <button class="action-btn delete" @click="emit('delete', test.id)" title="删除">
-              🗑️
-            </button>
+          <td>
+            <ActionDropdown
+              :items="getMenuItems(test)"
+              @select="(key) => handleActionSelect(key, test.id)"
+            />
           </td>
         </tr>
       </tbody>
@@ -78,6 +65,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import ActionDropdown from '@/components/ActionDropdown.vue'
+import type { MenuItem } from '@/components/ActionDropdown.vue'
 import type { Test } from '../types'
 import { getExamTypeLabel, getReviewStatusLabel } from '../types'
 
@@ -133,6 +122,43 @@ function formatDateTime(dateString: string): string {
 // 格式化时间(仅时间)
 function formatTime(dateString: string): string {
   return dateString // 假设数据已经是格式化的
+}
+
+/**
+ * 获取操作菜单项
+ */
+function getMenuItems(test: Test): MenuItem[] {
+  return [
+    { key: 'preview', label: '预览', icon: '👁️' },
+    { key: 'edit', label: '编辑', icon: '✏️' },
+    {
+      key: 'review',
+      label: '审核',
+      icon: '✅',
+      disabled: test.status !== 'pending'  // 非待审状态禁用
+    },
+    { key: 'delete', label: '删除', icon: '🗑️', danger: true }
+  ]
+}
+
+/**
+ * 处理操作选择
+ */
+function handleActionSelect(key: string, testId: string) {
+  switch (key) {
+    case 'preview':
+      emit('preview', testId)
+      break
+    case 'edit':
+      emit('edit', testId)
+      break
+    case 'review':
+      emit('review', testId)
+      break
+    case 'delete':
+      emit('delete', testId)
+      break
+  }
 }
 </script>
 
@@ -210,35 +236,6 @@ function formatTime(dateString: string): string {
 .status-badge.rejected {
   background: #f8d7da;
   color: #721c24;
-}
-
-.actions {
-  display: flex;
-  gap: 6px;
-}
-
-.action-btn {
-  padding: 6px 10px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s ease;
-}
-
-.action-btn:hover:not(:disabled) {
-  background: rgba(0, 102, 204, 0.1);
-  transform: scale(1.1);
-}
-
-.action-btn.delete:hover {
-  background: rgba(239, 83, 80, 0.1);
-}
-
-.action-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
 }
 
 .empty-state {

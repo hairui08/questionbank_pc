@@ -6,6 +6,13 @@
         <div class="tab-panel">
           <div class="prototype-wrapper">
             <div class="question-management-container">
+              <!-- 树形导航面板 -->
+              <SubjectTree 
+                @filter-change="handleFilterChange" 
+                :filter="filter"
+                v-model:active-node-id="activeNodeId"
+              />
+              
               <!-- 主内容区: 筛选器 + 操作按钮 + 表格 -->
               <div class="main-content">
                 <!-- 筛选器 -->
@@ -23,6 +30,13 @@
                     </button>
                     <button class="btn secondary" @click="handleIntelligentInput">
                       🤖 智能录题
+                    </button>
+                    <button
+                      class="btn warning"
+                      :disabled="selectedIds.length === 0"
+                      @click="handleBatchDisable"
+                    >
+                      🚫 批量禁用
                     </button>
                     <button
                       class="btn danger"
@@ -49,6 +63,7 @@
                   v-model:selectedIds="selectedIds"
                   @edit="handleEdit"
                   @delete="handleDeleteSingle"
+                  @toggle-status="handleToggleStatus"
                 />
 
                 <!-- 试题预览 -->
@@ -111,7 +126,7 @@
       <template #requirements>
         <div class="tab-panel">
           <div class="requirements-header">
-            <h2>试题管理需求文档</h2>
+            <h2> 试题管理需求文档</h2>
             <p>详细的功能需求、业务规则和验收标准，确保试题管理模块实现标准化。</p>
           </div>
 
@@ -160,7 +175,7 @@
                   <tr>
                     <td>试题列表</td>
                     <td>表格展示试题摘要信息</td>
-                    <td>包含选择框、题干内容(截取前50字)、题型、关联章节、关联知识点、试题难度、收费规则、创建时间、创建人、操作列</td>
+                    <td>包含选择框、题干内容(截取前50字)、题型、关联章节、关联知识点、试题难度、收费规则、操作时间、操作人、操作列</td>
                     <td>P0</td>
                   </tr>
                   <tr>
@@ -236,9 +251,45 @@
                     <td>P0</td>
                   </tr>
                   <tr>
-                    <td>创建人跟踪</td>
-                    <td>记录试题的创建人和创建时间</td>
-                    <td>创建时自动记录当前登录用户ID和创建时间;编辑时记录更新时间和更新人</td>
+                    <td>操作记录跟踪</td>
+                    <td>记录试题的操作人和操作时间</td>
+                    <td>创建和编辑时自动记录当前登录用户ID和操作时间</td>
+                    <td>P1</td>
+                  </tr>
+                  <tr>
+                    <td>试题来源标签显示</td>
+                    <td>在试题列表中显示试题来源标签</td>
+                    <td>若试题来源为试卷,则显示蓝色"来源:XXX试卷"标签;鼠标悬停显示来源试卷详细信息;来源标签显示在题干右侧</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>软删除操作</td>
+                    <td>支持将试题标记为已删除而不是物理删除</td>
+                    <td>点击删除按钮后,试题状态变为deleted,仍可查询;已删除试题在列表中默认不显示,可通过筛选器查看;提供恢复功能</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>标记过时操作</td>
+                    <td>支持将试题标记为已过时</td>
+                    <td>表格操作列提供"标记过时"按钮;点击后试题状态变为deprecated;已过时试题仍可在组卷时选择,但有警告提示</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>状态标签显示</td>
+                    <td>在试题列表中显示试题状态标签</td>
+                    <td>已删除试题显示红色"已删除"标签;已过时试题显示黄色"已过时"标签;禁用试题显示灰色"已禁用"标签;状态标签显示在题干右侧</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>恢复已删除试题</td>
+                    <td>支持恢复被软删除的试题</td>
+                    <td>在已删除试题列表中,操作列提供"恢复"按钮;点击后试题状态恢复为active;Toast提示"试题已恢复"</td>
+                    <td>P1</td>
+                  </tr>
+                  <tr>
+                    <td>取消过时标记</td>
+                    <td>支持取消试题的过时标记</td>
+                    <td>在已过时试题列表中,操作列提供"取消过时"按钮;点击后试题状态恢复为active;Toast提示"已取消过时标记"</td>
                     <td>P1</td>
                   </tr>
                 </tbody>
@@ -534,11 +585,47 @@
                   <tr>
                     <td>试题状态</td>
                     <td>Enum</td>
-                    <td>2种状态</td>
+                    <td>4种状态</td>
                     <td>✓</td>
                     <td>无</td>
                     <td>active</td>
-                    <td>active(启用) / disabled(禁用);禁用试题不可用于组卷</td>
+                    <td>active(启用) / disabled(禁用) / deleted(已删除) / deprecated(已过时);已删除和已过时试题默认不显示,可通过筛选器查看</td>
+                  </tr>
+                  <tr>
+                    <td>试题来源类型</td>
+                    <td>Enum</td>
+                    <td>2种来源</td>
+                    <td>✓</td>
+                    <td>无</td>
+                    <td>library</td>
+                    <td>library(题库录入) / exam(试卷同步);试卷同步的试题会显示来源标签</td>
+                  </tr>
+                  <tr>
+                    <td>来源试卷ID</td>
+                    <td>String</td>
+                    <td>试卷ID</td>
+                    <td>×</td>
+                    <td>无</td>
+                    <td>null</td>
+                    <td>仅当来源类型为exam时有值;记录试题来源于哪张试卷</td>
+                  </tr>
+                  <tr>
+                    <td>删除时间</td>
+                    <td>DateTime</td>
+                    <td>ISO 8601格式</td>
+                    <td>×</td>
+                    <td>无</td>
+                    <td>null</td>
+                    <td>仅当状态为deleted时有值;记录软删除时间</td>
+                  </tr>
+                  <tr>
+                    <td>标记过时时间</td>
+                    <td>DateTime</td>
+                    <td>ISO 8601格式</td>
+                    <td>×</td>
+                    <td>无</td>
+                    <td>null</td>
+                    <td>仅当状态为deprecated时有值;记录标记过时的时间</td>
                   </tr>
                   <tr style="background: #fff8dc;">
                     <td><strong>收费规则ID</strong></td>
@@ -689,7 +776,7 @@
                       <td>AC-05</td>
                       <td>用户点击某道试题的【详情】按钮</td>
                       <td>详情弹窗打开</td>
-                      <td>应展示试题完整信息,包括基本信息、题干、选项、答案、解析、创建时间等</td>
+                      <td>应展示试题完整信息,包括基本信息、题干、选项、答案、解析、操作时间(含时分秒)等</td>
                     </tr>
                     <tr>
                       <td>AC-06</td>
@@ -757,6 +844,48 @@
                       <td>点击搜索</td>
                       <td>列表应仅显示收费规则为 premium 的试题,筛选条件显示"收费规则: 高级"</td>
                     </tr>
+                    <tr>
+                      <td>AC-17</td>
+                      <td>用户在试题列表中查看某道从试卷同步而来的试题</td>
+                      <td>查看试题来源标签</td>
+                      <td>题干右侧显示蓝色"来源:2024年财务战略管理期末考试"标签,鼠标悬停显示试卷详细信息(试卷ID、创建时间等)</td>
+                    </tr>
+                    <tr>
+                      <td>AC-18</td>
+                      <td>用户在试题列表中点击某道试题的【删除】按钮</td>
+                      <td>确认软删除</td>
+                      <td>试题状态变为deleted,列表中该试题消失,Toast提示"试题已删除",试题数据仍保留在数据库中</td>
+                    </tr>
+                    <tr>
+                      <td>AC-19</td>
+                      <td>用户在试题列表中点击某道试题的【标记过时】按钮</td>
+                      <td>确认标记过时</td>
+                      <td>试题状态变为deprecated,试题右侧显示黄色"已过时"标签,Toast提示"已标记为过时",试题仍可在组卷时选择但有警告</td>
+                    </tr>
+                    <tr>
+                      <td>AC-20</td>
+                      <td>用户在试题列表筛选器中选择状态"已删除"</td>
+                      <td>查看已删除试题列表</td>
+                      <td>列表显示所有已删除试题,每道试题右侧显示红色"已删除"标签,操作列提供【恢复】按钮</td>
+                    </tr>
+                    <tr>
+                      <td>AC-21</td>
+                      <td>用户在试题列表筛选器中选择状态"已过时"</td>
+                      <td>查看已过时试题列表</td>
+                      <td>列表显示所有已过时试题,每道试题右侧显示黄色"已过时"标签,操作列提供【取消过时】按钮</td>
+                    </tr>
+                    <tr>
+                      <td>AC-22</td>
+                      <td>用户在已删除试题列表中点击某道试题的【恢复】按钮</td>
+                      <td>确认恢复</td>
+                      <td>试题状态恢复为active,试题从已删除列表中消失,Toast提示"试题已恢复",试题重新出现在正常列表中</td>
+                    </tr>
+                    <tr>
+                      <td>AC-23</td>
+                      <td>用户在已过时试题列表中点击某道试题的【取消过时】按钮</td>
+                      <td>确认取消过时标记</td>
+                      <td>试题状态恢复为active,黄色"已过时"标签消失,Toast提示"已取消过时标记",试题恢复正常状态</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -784,6 +913,17 @@
       @confirm="confirmDelete"
       @cancel="closeDeleteModal"
     />
+
+    <!-- 启用/禁用确认弹窗 -->
+    <ToggleStatusConfirmModal
+      v-if="showToggleStatusModal && toggleStatusTarget"
+      :show="showToggleStatusModal"
+      :item-name="toggleStatusTarget.name"
+      :current-status="toggleStatusTarget.currentStatus"
+      item-type="试题"
+      @confirm="handleToggleStatusConfirm"
+      @cancel="showToggleStatusModal = false"
+    />
   </AppLayout>
 </template>
 
@@ -796,12 +936,16 @@ import QuestionFilter from './components/QuestionFilter.vue'
 import QuestionTable from './components/QuestionTable.vue'
 import QuestionPreview from './components/QuestionPreview.vue'
 import DeleteConfirmModal from './components/DeleteConfirmModal.vue'
+import ToggleStatusConfirmModal from '@/components/ToggleStatusConfirmModal.vue'
+import SubjectTree from '@/views/question-management/components/SubjectTree.vue'
 import { useQuestionStore } from '@/stores/question'
+import { useChapterStore } from '@/stores/chapter'
 import { useToast } from '@/composables/useToast'
 import type { QuestionFilter as QuestionFilterType } from './types'
 
 const router = useRouter()
 const questionStore = useQuestionStore()
+const chapterStore = useChapterStore()
 const { showToast } = useToast()
 
 // 标签页配置
@@ -814,8 +958,11 @@ const tabs = [
 // 当前选中的科目
 const activeSubject = ref<{ id: string; name: string } | null>(null)
 
-// 筛选条件
-const filter = ref<QuestionFilterType>({})
+// 当前显示选中背景的节点ID
+const activeNodeId = ref<string>('')
+
+// 筛选条件（默认只显示启用的试题）
+const filter = ref<QuestionFilterType>({ status: 'active' })
 
 // 分页参数
 const currentPage = ref(1)
@@ -831,6 +978,10 @@ const viewMode = ref<'table' | 'preview'>('table')
 const showDeleteModal = ref(false)
 const isBatchDelete = ref(false)
 const deleteTargetIds = ref<string[]>([])
+
+// 启用/禁用确认弹窗
+const showToggleStatusModal = ref(false)
+const toggleStatusTarget = ref<{ id: string; name: string; currentStatus: 'active' | 'disabled' } | null>(null)
 
 // 计算属性：分页数据
 const paginatedData = computed(() => {
@@ -871,25 +1022,64 @@ const visiblePages = computed(() => {
 // 删除数量
 const deleteCount = computed(() => deleteTargetIds.value.length)
 
-// 监听科目变化,重置筛选条件和分页
-watch(activeSubject, (newSubject) => {
-  if (newSubject) {
-    filter.value.subjectId = newSubject.id
-    filter.value.chapterId = ''
+// 科目切换 - 目前未使用
+function handleSubjectChange(subject: { id: string; name: string } | null) {
+  activeSubject.value = subject
+}
+
+// 处理树形面板筛选变化
+function handleFilterChange(filterState: any) {
+  // 先保存当前状态，用于判断是否需要取消选中
+  const currentFilter = { ...filter.value }
+  let shouldUpdate = false
+  
+  // 判断当前节点是否已经被选中
+  const currentNodeId = activeNodeId.value
+  // 获取当前类型对应的ID键名（处理subsection的特殊情况）
+  let currentTypeKey = ''
+  if (filterState.type === 'subsection') {
+    currentTypeKey = 'subSectionId'
+  } else {
+    currentTypeKey = filterState.type + 'Id'
+  }
+  const isCurrentlySelected = currentNodeId === filterState[currentTypeKey]
+  
+  if (isCurrentlySelected) {
+    // 已经选中，取消选中
+    activeNodeId.value = ''
+    // 重置层级筛选条件，但保留其他筛选条件
+    filter.value = {
+      ...filter.value, // 保留原来的属性
+      projectId: '',
+      subjectId: '',
+      chapterId: '',
+      sectionId: '',
+      subSectionId: '',
+      paperId: ''
+    }
+    shouldUpdate = true
+  } else {
+    // 未选中，设置当前点击节点的选中状态
+    // 将当前点击节点的ID保存到activeNodeId中
+    activeNodeId.value = filterState[currentTypeKey]
+    // 将完整的层级信息保存到filter对象中，用于添加页面跳转，保留其他筛选条件
+    filter.value = {
+      ...filter.value, // 保留原来的属性
+      projectId: filterState.projectId || '',
+      subjectId: filterState.subjectId || '',
+      chapterId: filterState.chapterId || '',
+      sectionId: filterState.sectionId || '',
+      subSectionId: filterState.subSectionId || '',
+      paperId: filterState.paperId || ''
+    }
+    shouldUpdate = true
+  }
+  
+  // 只有当状态发生变化时，才重置分页和选择
+  if (shouldUpdate) {
     currentPage.value = 1
     selectedIds.value = []
   }
-})
-
-// 监听筛选条件变化,重置分页
-watch(filter, () => {
-  currentPage.value = 1
-  selectedIds.value = []
-}, { deep: true })
-
-// 科目切换
-function handleSubjectChange(subject: { id: string; name: string } | null) {
-  activeSubject.value = subject
 }
 
 // 搜索
@@ -900,14 +1090,44 @@ function handleSearch() {
 
 // 重置
 function handleReset() {
-  filter.value = activeSubject.value ? { subjectId: activeSubject.value.id } : {}
+  filter.value = activeSubject.value ? { subjectId: activeSubject.value.id, status: 'active' } : { status: 'active' }
   currentPage.value = 1
   selectedIds.value = []
 }
 
 // 添加试题
 function handleAdd() {
-  router.push('/question-management/add')
+  // 获取当前选中的完整层级信息
+  const currentProjectId = filter.value.projectId || ''
+  const currentSubjectId = filter.value.subjectId || ''
+  const currentChapterId = filter.value.chapterId || ''
+  const currentSectionId = filter.value.sectionId || ''
+  const currentSubSectionId = filter.value.subSectionId || ''
+  const currentPaperId = filter.value.paperId || ''
+  
+  // 构建路由参数，包含完整层级信息
+  // 无论当前选中哪个层级，都将所有父级节点的ID添加到参数中
+  const query: { 
+    projectId?: string; 
+    subjectId?: string; 
+    chapterId?: string; 
+    sectionId?: string; 
+    subSectionId?: string; 
+    paperId?: string 
+  } = {}
+  
+  // 始终包含所有层级的ID，即使是父级节点
+  if (currentProjectId) query.projectId = currentProjectId
+  if (currentSubjectId) query.subjectId = currentSubjectId
+  if (currentChapterId) query.chapterId = currentChapterId
+  if (currentSectionId) query.sectionId = currentSectionId
+  if (currentSubSectionId) query.subSectionId = currentSubSectionId
+  if (currentPaperId) query.paperId = currentPaperId
+  
+  router.push({
+    path: '/question-management/add',
+    query
+  })
 }
 
 // 智能录题
@@ -922,6 +1142,27 @@ function toggleViewMode() {
   if (viewMode.value === 'preview') {
     selectedIds.value = []
   }
+}
+
+// 批量禁用
+function handleBatchDisable() {
+  if (selectedIds.value.length === 0) {
+    showToast('请先选择要禁用的试题', { type: 'error' })
+    return
+  }
+
+  // 确认对话框
+  if (!confirm(`确定要禁用选中的 ${selectedIds.value.length} 个试题吗？`)) {
+    return
+  }
+
+  // 批量切换状态为禁用
+  selectedIds.value.forEach(id => {
+    questionStore.toggleQuestionStatus(id, 'disabled')
+  })
+
+  showToast(`成功禁用 ${selectedIds.value.length} 个试题`, { type: 'success' })
+  selectedIds.value = []
 }
 
 // 批量删除
@@ -945,6 +1186,39 @@ function handleDeleteSingle(id: string) {
 // 编辑
 function handleEdit(id: string) {
   router.push(`/question-management/edit/${id}`)
+}
+
+// 处理启用/禁用
+function handleToggleStatus(id: string) {
+  const question = questionStore.getQuestionById(id)
+  if (!question) return
+
+  toggleStatusTarget.value = {
+    id,
+    name: question.stem,
+    currentStatus: question.status
+  }
+
+  // 如果是禁用操作，显示确认弹窗
+  if (question.status === 'active') {
+    showToggleStatusModal.value = true
+  } else {
+    // 启用操作直接执行
+    handleToggleStatusConfirm()
+  }
+}
+
+// 确认启用/禁用
+function handleToggleStatusConfirm() {
+  if (!toggleStatusTarget.value) return
+
+  questionStore.toggleQuestionStatus(toggleStatusTarget.value.id)
+
+  const action = toggleStatusTarget.value.currentStatus === 'active' ? '禁用' : '启用'
+  showToast(`试题已${action}`)
+
+  showToggleStatusModal.value = false
+  toggleStatusTarget.value = null
 }
 
 // 确认删除
@@ -980,7 +1254,6 @@ function handlePageSizeChange() {
 
 <style scoped>
 .tab-panel {
-  padding: 32px;
   animation: fade-in 0.3s ease;
 }
 
@@ -1001,7 +1274,6 @@ function handlePageSizeChange() {
 
 .question-management-container {
   display: flex;
-  flex-direction: column;
   gap: 24px;
   min-height: calc(100vh - 240px);
 }
@@ -1010,6 +1282,7 @@ function handlePageSizeChange() {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  flex: 1;
 }
 
 /* 操作按钮区 */
@@ -1069,6 +1342,21 @@ function handlePageSizeChange() {
 
 .btn.secondary:hover {
   background: rgba(0, 102, 204, 0.08);
+}
+
+.btn.warning {
+  background: linear-gradient(180deg, #ffa726 0%, #fb8c00 100%);
+  color: #ffffff;
+  border-color: #f57c00;
+}
+
+.btn.warning:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ff9800 0%, #f57c00 100%);
+}
+
+.btn.warning:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn.danger {

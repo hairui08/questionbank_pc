@@ -3,22 +3,36 @@
     <div class="table-header">
       <div class="header-title">
         <h3>{{ projectName }} - {{ subjectName }}</h3>
-        <p>共 {{ knowledgePoints.length }} 个知识点</p>
+        <p>共 {{ knowledgePoints.length }} 个知识点 <span v-if="hasSelected">· 已选中 {{ selectedIds.size }} 项</span></p>
       </div>
       <div class="header-actions">
         <div class="filter-group">
-          <label for="status-filter">启用状态：</label>
+          <label for="status-filter">状态：</label>
           <select
             id="status-filter"
             :value="statusFilter"
             @change="$emit('update:status-filter', ($event.target as HTMLSelectElement).value)"
           >
+            <option value="all">全部</option>
             <option value="active">启用</option>
             <option value="disabled">禁用</option>
-            <option value="all">全部</option>
           </select>
         </div>
-        <button class="btn-add" @click="$emit('add-knowledge-point')">
+        <div class="batch-actions">
+          <button class="btn-batch btn-enable" :disabled="!hasSelected" @click="handleBatchEnable">
+            <span class="icon">✅</span>
+            批量启用
+          </button>
+          <button class="btn-batch btn-disable" :disabled="!hasSelected" @click="handleBatchDisable">
+            <span class="icon">🔒</span>
+            批量禁用
+          </button>
+          <button class="btn-batch btn-delete" :disabled="!hasSelected" @click="handleBatchDelete">
+            <span class="icon">🗑️</span>
+            批量删除
+          </button>
+        </div>
+        <button class="btn-add" @click="$emit('add-knowledge-point')" :disabled="!props.isAddEnabled">
           <span class="icon">+</span>
           添加知识点
         </button>
@@ -29,29 +43,36 @@
       <table v-if="knowledgePoints.length > 0">
         <thead>
           <tr>
-            <th width="60px">序号</th>
-            <th width="18%">知识点名称</th>
-            <th width="14%">章</th>
-            <th width="14%">节</th>
+            <th width="50px" style="text-align: center">
+              <input
+                type="checkbox"
+                :checked="isAllSelected"
+                @change="handleSelectAll"
+                class="checkbox-input"
+              />
+            </th>
+            <th width="20%">名称</th>
+            <th width="12%">章</th>
+            <th width="12%">节</th>
             <th width="10%">试题数量</th>
             <th width="15%">创建时间</th>
             <th width="10%">创建人</th>
-            <th width="15%">操作</th>
+            <th width="10%">状态</th>
+            <th width="11%">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(kp, index) in knowledgePoints" :key="kp.id">
-            <td style="text-align: center">{{ index + 1 }}</td>
+            <td style="text-align: center">
+              <input
+                type="checkbox"
+                :checked="selectedIds.has(kp.id)"
+                @change="toggleSelect(kp.id)"
+                class="checkbox-input"
+              />
+            </td>
             <td>
-              <div class="knowledge-point-name">
-                <span class="name-text">{{ kp.name }}</span>
-                <span
-                  v-if="kp.status === 'disabled'"
-                  class="status-badge disabled"
-                >
-                  已禁用
-                </span>
-              </div>
+              <span class="name-text">{{ kp.name }}</span>
             </td>
             <!-- 章列 -->
             <td>
@@ -115,27 +136,15 @@
               <span class="creator-text">{{ getCreatorName(kp.creatorId) }}</span>
             </td>
             <td>
-              <div class="action-buttons">
-                <button
-                  class="btn-action btn-edit"
-                  @click="$emit('edit-knowledge-point', kp)"
-                >
-                  编辑
-                </button>
-                <button
-                  class="btn-action btn-delete"
-                  @click="$emit('delete-knowledge-point', kp)"
-                >
-                  删除
-                </button>
-                <button
-                  class="btn-action btn-toggle"
-                  :class="{ 'btn-toggle-enable': kp.status === 'disabled', 'btn-toggle-disable': kp.status === 'active' }"
-                  @click="$emit('toggle-status', kp)"
-                >
-                  {{ kp.status === 'active' ? '禁用' : '启用' }}
-                </button>
-              </div>
+              <span :class="['status-badge', kp.status === 'active' ? 'active' : 'disabled']">
+                {{ kp.status === 'active' ? '启用' : '禁用' }}
+              </span>
+            </td>
+            <td>
+              <ActionDropdown
+                :items="getActionMenuItems(kp)"
+                @select="(key) => handleActionSelect(key, kp)"
+              />
             </td>
           </tr>
         </tbody>
@@ -151,7 +160,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, watch } from 'vue'
 import { useKnowledgePointStore } from '@/stores/knowledgePoint'
+import ActionDropdown from '@/components/ActionDropdown.vue'
+import type { MenuItem } from '@/components/ActionDropdown.vue'
 import type { KnowledgePoint } from '../types'
 
 interface Props {
@@ -160,6 +172,7 @@ interface Props {
   projectName: string
   knowledgePoints: KnowledgePoint[]
   statusFilter: string
+  isAddEnabled: boolean
 }
 
 const props = defineProps<Props>()
@@ -171,7 +184,13 @@ const emit = defineEmits<{
   'toggle-status': [kp: KnowledgePoint]
   'show-questions': [knowledgePointId: string]
   'update:status-filter': [value: string]
+  'batch-enable': [ids: string[]]
+  'batch-disable': [ids: string[]]
+  'batch-delete': [ids: string[]]
 }>()
+
+// 批量选择状态
+const selectedIds = ref<Set<string>>(new Set())
 
 const knowledgePointStore = useKnowledgePointStore()
 
@@ -247,6 +266,106 @@ const getCreatorName = (creatorId: string): string => {
   }
   return creatorMap[creatorId] || creatorId
 }
+
+/**
+ * 获取操作菜单项
+ */
+const getActionMenuItems = (kp: KnowledgePoint): MenuItem[] => {
+  return [
+    { key: 'edit', label: '编辑', icon: '✏️' },
+    {
+      key: 'toggle',
+      label: kp.status === 'active' ? '禁用' : '启用',
+      icon: kp.status === 'active' ? '🔒' : '✅'
+    },
+    { key: 'delete', label: '删除', icon: '🗑️', danger: true }
+  ]
+}
+
+/**
+ * 处理操作选择
+ */
+const handleActionSelect = (key: string, kp: KnowledgePoint) => {
+  switch (key) {
+    case 'edit':
+      emit('edit-knowledge-point', kp)
+      break
+    case 'toggle':
+      emit('toggle-status', kp)
+      break
+    case 'delete':
+      emit('delete-knowledge-point', kp)
+      break
+  }
+}
+
+/**
+ * 全选/反选逻辑
+ */
+const isAllSelected = computed(() => {
+  if (props.knowledgePoints.length === 0) return false
+  return props.knowledgePoints.every(kp => selectedIds.value.has(kp.id))
+})
+
+const handleSelectAll = () => {
+  if (isAllSelected.value) {
+    // 反选：清空所有选中项
+    selectedIds.value.clear()
+  } else {
+    // 全选：选中当前页所有知识点
+    props.knowledgePoints.forEach(kp => selectedIds.value.add(kp.id))
+  }
+}
+
+/**
+ * 单选逻辑
+ */
+const toggleSelect = (kpId: string) => {
+  if (selectedIds.value.has(kpId)) {
+    selectedIds.value.delete(kpId)
+  } else {
+    selectedIds.value.add(kpId)
+  }
+}
+
+/**
+ * 批量操作按钮启用状态
+ */
+const hasSelected = computed(() => selectedIds.value.size > 0)
+
+/**
+ * 批量启用
+ */
+const handleBatchEnable = () => {
+  if (selectedIds.value.size === 0) return
+  emit('batch-enable', Array.from(selectedIds.value))
+  selectedIds.value.clear()
+}
+
+/**
+ * 批量禁用
+ */
+const handleBatchDisable = () => {
+  if (selectedIds.value.size === 0) return
+  emit('batch-disable', Array.from(selectedIds.value))
+  selectedIds.value.clear()
+}
+
+/**
+ * 批量删除
+ */
+const handleBatchDelete = () => {
+  if (selectedIds.value.size === 0) return
+  emit('batch-delete', Array.from(selectedIds.value))
+  selectedIds.value.clear()
+}
+
+/**
+ * 监听知识点列表变化，清空选中项（筛选器改变时）
+ */
+watch(() => props.statusFilter, () => {
+  selectedIds.value.clear()
+})
 </script>
 
 <style scoped>
@@ -287,6 +406,78 @@ const getCreatorName = (creatorId: string): string => {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-batch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-batch .icon {
+  font-size: 14px;
+}
+
+.btn-batch.btn-enable {
+  background: #ecfff2;
+  color: #2e8b57;
+  border: 1px solid rgba(46, 139, 87, 0.3);
+}
+
+.btn-batch.btn-enable:hover {
+  background: #d4f5e0;
+  border-color: #2e8b57;
+}
+
+.btn-batch.btn-disable {
+  background: #fff4e6;
+  color: #d97706;
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+.btn-batch.btn-disable:hover {
+  background: #ffe4c4;
+  border-color: #d97706;
+}
+
+.btn-batch.btn-delete {
+  background: #fee;
+  color: #c33;
+  border: 1px solid rgba(204, 51, 51, 0.3);
+}
+
+.btn-batch.btn-delete:hover {
+  background: #fdd;
+  border-color: #c33;
+}
+
+/* 批量按钮禁用状态 */
+.btn-batch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #e0e0e0 !important;
+  color: #999 !important;
+  border-color: #ccc !important;
+}
+
+.btn-batch:disabled:hover {
+  background: #e0e0e0 !important;
+  border-color: #ccc !important;
+  transform: none;
 }
 
 .filter-group {
@@ -341,6 +532,21 @@ const getCreatorName = (creatorId: string): string => {
   background: var(--accent-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-add:disabled {
+  background: #e0e0e0;
+  color: #999;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.btn-add:disabled:hover {
+  background: #e0e0e0;
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-add .icon {
@@ -431,6 +637,12 @@ td {
   color: #c33;
 }
 
+.status-badge.active {
+  background: #ecfff2;
+  color: #2e8b57;
+  border: 1px solid rgba(46, 139, 87, 0.4);
+}
+
 /* 紧凑列表容器 */
 .compact-list {
   cursor: help;
@@ -493,67 +705,6 @@ td {
   font-size: 13px;
 }
 
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-action {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-edit {
-  background: #e8f4fd;
-  color: #0066cc;
-}
-
-.btn-edit:hover {
-  background: #0066cc;
-  color: white;
-}
-
-.btn-delete {
-  background: #fee;
-  color: #c33;
-}
-
-.btn-delete:hover {
-  background: #c33;
-  color: white;
-}
-
-.btn-toggle {
-  min-width: 60px;
-}
-
-.btn-toggle-disable {
-  background: #f5f7fa;
-  color: #5a6c7d;
-  border: 1px solid #dfe3eb;
-}
-
-.btn-toggle-disable:hover {
-  background: #e4eaf2;
-  color: #2c3e50;
-}
-
-.btn-toggle-enable {
-  background: #e8f4fd;
-  color: #0066cc;
-  border: 1px solid #0066cc;
-}
-
-.btn-toggle-enable:hover {
-  background: #0066cc;
-  color: white;
-}
-
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -579,5 +730,16 @@ td {
   margin: 0;
   font-size: 14px;
   color: #999;
+}
+
+.checkbox-input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.checkbox-input:hover {
+  transform: scale(1.1);
 }
 </style>

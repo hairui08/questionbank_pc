@@ -1,26 +1,39 @@
 <template>
-  <div class="exam-page">
+  <div class="exam-page" :class="'theme-' + uiBg" :style="{ background: bgColorMap[uiBg] }">
     <!-- 头部 -->
-    <ExamHeader />
+    <div class="exam-header-fixed"><ExamHeader /></div>
 
     <!-- 主体内容 -->
     <div class="exam-container">
       <!-- 左侧：试题区 -->
       <div class="question-section">
-        <QuestionPanel
-          v-if="currentQuestion"
-          :question="currentQuestion"
-          :exam-title="currentSession?.examTitle || ''"
-          :exam-type="currentSession?.examType || ''"
-          :current-index="currentSession?.currentIndex || 0"
-          :total-questions="currentSession?.questions.length || 0"
-          :user-answer="currentUserAnswer"
-          :font-size="currentSession?.settings.fontSize || 'medium'"
-          @answer-change="handleAnswerChange"
-          @previous="handlePrevious"
-          @next="handleNext"
-        />
-
+        <template v-if="currentSession">
+          <div class="exam-info">
+            <button class="back-button" @click="handleBack">
+              <span class="back-icon">←</span>
+              <span>返回</span>
+            </button>
+            <span class="exam-type">{{ examTypeLabels[currentSession.examType]}}</span>
+            <span class="separator">·</span>
+            <span class="exam-title">{{ currentSession.examTitle || '' }}</span>
+          </div>
+          <div
+            v-for="(q, idx) in orderedQuestions"
+            :key="q.id"
+            class="question-item"
+            :id="`question-item-${idx}`"
+          >
+            <QuestionPanel
+              :question="q"
+              :exam-type="currentSession.examType || ''"
+              :current-index="idx"
+              :total-questions="orderedQuestions.length"
+              :user-answer="(answers[q.id] && answers[q.id].answer) || null"
+              :font-size="uiFontSize"
+              @answer-change="(ans) => handleAnswerChangeFor(q.id, ans)"
+            />
+          </div>
+        </template>
         <div v-else class="loading-state">
           <p>加载中...</p>
         </div>
@@ -30,7 +43,7 @@
       <div class="answer-card-section">
         <AnswerCard
           v-if="currentSession"
-          :questions="currentSession.questions"
+          :questions="orderedQuestions"
           :answers="answers"
           :statistics="statistics"
           @go-to-question="handleGoToQuestion"
@@ -38,6 +51,8 @@
           @open-settings="showSettings = true"
           @reset="handleReset"
           @submit="handleSubmit"
+          @save-and-exit="handleSaveAndExit"
+          @apply-settings="handleUiApply"
         />
       </div>
     </div>
@@ -57,29 +72,6 @@
       @update="handleSettingsUpdate"
     />
 
-    <!-- 继续/重做对话框 -->
-    <BaseModal
-      :visible="showContinueDialog"
-      @update:visible="() => {}"
-      title="发现未完成的答题记录"
-      :close-on-click-outside="false"
-      :show-footer="false"
-    >
-      <div class="continue-dialog">
-        <p class="dialog-message">
-          检测到您之前有未完成的答题记录，您希望如何继续？
-        </p>
-
-        <div class="dialog-actions">
-          <button class="dialog-btn secondary" @click="handleRestart">
-            重新做题
-          </button>
-          <button class="dialog-btn primary" @click="handleContinue">
-            继续答题
-          </button>
-        </div>
-      </div>
-    </BaseModal>
   </div>
 </template>
 
@@ -88,12 +80,11 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useExamSessionStore } from '@/stores/examSession'
 import { useQuestionStore } from '@/stores/question'
-import ExamHeader from '@/components/Exam/ExamHeader.vue'
-import QuestionPanel from '@/components/Exam/QuestionPanel.vue'
-import AnswerCard from '@/components/Exam/AnswerCard.vue'
-import ScientificCalculator from '@/components/Exam/ScientificCalculator.vue'
-import ExamSettings from '@/components/Exam/ExamSettings.vue'
-import BaseModal from '@/components/Modal/BaseModal.vue'
+import QuestionPanel from '@/components/QuestionBank/DoQuestion/Exam/QuestionPanel.vue'
+import AnswerCard from '@/components/QuestionBank/DoQuestion/Exam/AnswerCard.vue'
+import ExamHeader from '@/components/QuestionBank/Common/ExamHeader.vue'
+import ScientificCalculator from '@/components/QuestionBank/Common/ScientificCalculator.vue'
+import ExamSettings from '@/components/QuestionBank/Common/ExamSettings.vue'
 import type { ExamSettings as ExamSettingsType } from '@/stores/examSession'
 
 const route = useRoute()
@@ -104,70 +95,75 @@ const questionStore = useQuestionStore()
 // 弹窗状态
 const showCalculator = ref(false)
 const showSettings = ref(false)
-const showContinueDialog = ref(false)
+
+const uiBg = ref<'white'|'mint'|'sand'>(loadBg())
+const uiFontSize = ref<'small'|'medium'|'large'>(loadFontSize())
+const bgColorMap: Record<'white'|'mint'|'sand', string> = { white: '#f4f5f7', mint: '#e9f7ef', sand: '#efefea' }
+function loadBg(): 'white'|'mint'|'sand' {
+  const b = localStorage.getItem('analysis.bgColor')
+  return b === 'mint' || b === 'sand' || b === 'white' ? b : 'white'
+}
+function loadFontSize(): 'small'|'medium'|'large' {
+  const f = localStorage.getItem('analysis.fontSize')
+  return f === 'small' || f === 'medium' || f === 'large' ? f : 'medium'
+}
 
 // 从 store 获取状态
 const currentSession = computed(() => examSessionStore.currentSession)
-const currentQuestion = computed(() => examSessionStore.currentQuestion)
 const answers = computed(() => examSessionStore.answers)
 const statistics = computed(() => examSessionStore.statistics)
-
-// 当前题目的用户答案
-const currentUserAnswer = computed(() => {
-  if (!currentQuestion.value) return null
-  const answer = answers.value[currentQuestion.value.id]
-  return answer ? answer.answer : null
+const orderedQuestions = computed(() => {
+  const qs = currentSession.value?.questions || []
+  const groups: Record<string, any[]> = {}
+  const order: string[] = []
+  qs.forEach((q: any) => {
+    const t = q.type
+    if (!groups[t]) { groups[t] = []; order.push(t) }
+    groups[t].push(q)
+  })
+  return order.flatMap(t => groups[t])
 })
 
 // 初始化答题会话
 onMounted(async () => {
   const examId = route.params.id as string
 
-  // 检查是否是错题练习（会话已在 wrong-questions.vue 中创建）
   if (examId.startsWith('wrong-')) {
-    // 显示继续/重做对话框（如有未完成会话）
-    if (examSessionStore.hasUnfinishedSession) {
-      showContinueDialog.value = true
-    }
-    // 不需要执行 startNewExam，会话已由错题页面创建
     return
   }
 
-  // 普通考试：检查是否有未完成的会话
-  if (examSessionStore.hasUnfinishedSession) {
-    // 显示继续/重新做题的对话框
-    showContinueDialog.value = true
+  const cs = examSessionStore.currentSession
+  if (cs && cs.examId === examId) {
+    examSessionStore.continueExam()
+    const t = route.query.title as string | undefined
+    const o = route.query.order as string | undefined
+    if (o || t) {
+      const composed = o && t ? `${o}·${t}` : (t || examSessionStore.currentSession!.examTitle)
+      examSessionStore.currentSession!.examTitle = composed
+    }
   } else {
-    // 开始新的答题会话
+    examSessionStore.clearSession()
     startNewExam(examId)
   }
 })
 
 // 开始新的答题会话
 function startNewExam(examId: string) {
-  // 这里简化处理，从 questionStore 获取题目
-  const questions = questionStore.mockQuestions.slice(0, 10) // 取前10道题作为示例
+  const questions = questionStore.mockQuestions.slice(0, 10)
+  const rawTitle = route.query.title as string | undefined
+  const order = route.query.order as string | undefined
+  const typeQ = route.query.type as string | undefined
+  const examType = (typeQ === 'chapter' || typeQ === 'realExam' || typeQ === 'sprint' || typeQ === 'entrance') ? typeQ : 'chapter'
+  const title = order && rawTitle ? `${order}·${rawTitle}` : (rawTitle || '第1章·会计政策变更专项练习')
 
   examSessionStore.startExam(
     examId,
-    'chapter', // 暂时固定为章节练习
-    '第1章·会计政策变更专项练习',
+    examType,
+    title,
     's1',
     '会计',
     questions
   )
-}
-
-// 处理继续答题
-function handleContinue() {
-  showContinueDialog.value = false
-  examSessionStore.continueExam()
-}
-
-// 处理重新做题
-function handleRestart() {
-  showContinueDialog.value = false
-  examSessionStore.resetExam()
 }
 
 // 离开页面前提示
@@ -176,24 +172,15 @@ onBeforeUnmount(() => {
 })
 
 // 处理答案变化
-function handleAnswerChange(answer: string | string[] | boolean | null) {
-  if (!currentQuestion.value) return
-  examSessionStore.saveAnswer(currentQuestion.value.id, answer)
-}
-
-// 上一题
-function handlePrevious() {
-  examSessionStore.previousQuestion()
-}
-
-// 下一题
-function handleNext() {
-  examSessionStore.nextQuestion()
+function handleAnswerChangeFor(questionId: string, answer: string | string[] | boolean | null) {
+  examSessionStore.saveAnswer(questionId, answer)
 }
 
 // 跳转到指定题目
 function handleGoToQuestion(index: number) {
   examSessionStore.goToQuestion(index)
+  const el = document.getElementById(`question-item-${index}`)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 // 重做
@@ -213,18 +200,53 @@ function handleSubmit() {
   }
 }
 
-// 更新设置
+// 暂存并退出
+function handleSaveAndExit() {
+  router.push('/student')
+}
+
+// 更新设置（弹窗）
 function handleSettingsUpdate(newSettings: Partial<ExamSettingsType>) {
   examSessionStore.updateSettings(newSettings)
+}
+
+// 来自答题卡的即时设置联动（背景）
+function handleUiApply(payload: { fontSize: 'small'|'medium'|'large'; bgColor: 'white'|'mint'|'sand' }) {
+  uiFontSize.value = payload.fontSize
+  uiBg.value = payload.bgColor
+  localStorage.setItem('analysis.fontSize', payload.fontSize)
+  localStorage.setItem('analysis.bgColor', payload.bgColor)
+}
+
+// 试卷类型标签映射
+const examTypeLabels: Record<string, string> = {
+  chapter: '章节练习',
+  realExam: '历年真题',
+  sprint: '考前冲刺',
+  entrance: '入学测试'
+}
+
+// 返回题库
+function handleBack() {
+  router.push('/student')
 }
 </script>
 
 <style scoped>
 .exam-page {
+  --header-height: 72px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background: #f4f5f7;
+}
+
+.exam-header-fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
 }
 
 .exam-container {
@@ -232,6 +254,7 @@ function handleSettingsUpdate(newSettings: Partial<ExamSettingsType>) {
   grid-template-columns: 1fr 380px;
   gap: 20px;
   padding: 20px 32px;
+  padding-top: calc(var(--header-height) + 20px);
   flex: 1;
   max-width: 1600px;
   margin: 0 auto;
@@ -244,9 +267,9 @@ function handleSettingsUpdate(newSettings: Partial<ExamSettingsType>) {
 
 .answer-card-section {
   position: sticky;
-  top: 20px;
+  top: calc(var(--header-height) + 20px);
   height: fit-content;
-  max-height: calc(100vh - 100px);
+  max-height: calc(100vh - var(--header-height) - 60px);
 }
 
 .loading-state {
@@ -285,57 +308,45 @@ function handleSettingsUpdate(newSettings: Partial<ExamSettingsType>) {
   }
 }
 
-/* 继续/重做对话框样式 */
-.continue-dialog {
-  padding: 20px 0;
-}
+.theme-mint{ --brand-primary:#52c41a; --brand-tint: rgba(82,196,26,0.12); --panel-border:#cfe8d8; --panel-bg:#e9f7ef; --analysis-bg:#f3fff6; --analysis-border:#cfe8d8; --analysis-title:#43a047 }
+.theme-sand{ --brand-primary:#d48806; --brand-tint: rgba(212,136,6,0.12); --panel-border:#eadfcd; --panel-bg:#efefea; --analysis-bg:#fff9f0; --analysis-border:#ffe0a6; --analysis-title:#d48806 }
 
-.dialog-message {
-  font-size: 15px;
-  line-height: 1.7;
-  color: #333;
-  margin: 0 0 24px 0;
-  text-align: center;
-}
-
-.dialog-actions {
+.exam-info {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 10;
   display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.dialog-btn {
-  min-width: 120px;
-  padding: 12px 24px;
-  border-radius: 999px;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
   font-size: 14px;
   font-weight: 600;
+  color: #333;
+  border-radius: 16px 16px 0 0;
+  background: white;
+}
+
+.exam-type {
+  margin-left: 20px;
+  color: var(--brand-primary, #ff6f3c);
+}
+
+.separator {
+  color: #ccc;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
   cursor: pointer;
   transition: all 0.2s ease;
-}
-
-.dialog-btn.primary {
-  border: none;
-  background: linear-gradient(135deg, #ff7b50 0%, #ff4d3a 100%);
-  color: #ffffff;
-  box-shadow: 0 8px 16px rgba(255, 94, 66, 0.25);
-}
-
-.dialog-btn.primary:hover {
-  background: linear-gradient(135deg, #ff5722 0%, #e64a19 100%);
-  box-shadow: 0 10px 20px rgba(255, 87, 34, 0.35);
-  transform: translateY(-1px);
-}
-
-.dialog-btn.secondary {
-  border: 1px solid #e0e0e0;
-  background: #ffffff;
-  color: #666;
-}
-
-.dialog-btn.secondary:hover {
-  border-color: var(--brand-primary, #ff6f3c);
-  background: rgba(255, 111, 60, 0.03);
-  color: var(--brand-primary, #ff6f3c);
 }
 </style>

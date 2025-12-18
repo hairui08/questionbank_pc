@@ -22,7 +22,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 1,
       creator: '张老师',
       createdAt: '2025-01-05 09:00',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: true
     },
     {
       id: 'ls-002',
@@ -32,7 +33,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 2,
       creator: '张老师',
       createdAt: '2025-01-05 09:05',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     },
     {
       id: 'ls-003',
@@ -42,7 +44,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 3,
       creator: '张老师',
       createdAt: '2025-01-05 09:10',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     },
     {
       id: 'ls-004',
@@ -52,7 +55,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 4,
       creator: '张老师',
       createdAt: '2025-01-05 09:15',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     },
     // 高级会计师 - 税务风险控制 (s2)
     {
@@ -63,7 +67,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 1,
       creator: '李老师',
       createdAt: '2025-01-06 10:00',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: true
     },
     {
       id: 'ls-006',
@@ -73,7 +78,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 2,
       creator: '李老师',
       createdAt: '2025-01-06 10:05',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     },
     {
       id: 'ls-007',
@@ -83,7 +89,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 3,
       creator: '李老师',
       createdAt: '2025-01-06 10:10',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     },
     // 高级会计师 - 内部控制优化 (s3)
     {
@@ -94,7 +101,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 1,
       creator: '王老师',
       createdAt: '2025-01-07 11:00',
-      status: 'disabled'
+      status: 'disabled',
+      isChapterPractice: true
     },
     // 高级经济师 - 宏观经济分析 (s4)
     {
@@ -105,7 +113,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 1,
       creator: '赵老师',
       createdAt: '2025-01-08 14:00',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: true
     },
     {
       id: 'ls-010',
@@ -115,7 +124,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 2,
       creator: '赵老师',
       createdAt: '2025-01-08 14:05',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     },
     {
       id: 'ls-011',
@@ -125,7 +135,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 3,
       creator: '赵老师',
       createdAt: '2025-01-08 14:10',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     },
     // 中级会计师 - 成本管理实务 (s8)
     {
@@ -136,7 +147,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 1,
       creator: '孙老师',
       createdAt: '2025-01-10 15:00',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     },
     {
       id: 'ls-013',
@@ -146,7 +158,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 2,
       creator: '孙老师',
       createdAt: '2025-01-10 15:05',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: true
     },
     {
       id: 'ls-014',
@@ -156,7 +169,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 3,
       creator: '孙老师',
       createdAt: '2025-01-10 15:10',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     },
     {
       id: 'ls-015',
@@ -166,7 +180,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
       sortOrder: 4,
       creator: '孙老师',
       createdAt: '2025-01-10 15:15',
-      status: 'active'
+      status: 'active',
+      isChapterPractice: false
     }
   ])
 
@@ -234,7 +249,8 @@ export const useLearningStageStore = defineStore('learningStage', () => {
         hour: '2-digit',
         minute: '2-digit'
       }),
-      status: 'active'
+      status: 'active',
+      isChapterPractice: data.isChapterPractice
     }
 
     learningStages.value.push(newStage)
@@ -265,6 +281,7 @@ export const useLearningStageStore = defineStore('learningStage', () => {
 
     stage.name = data.name.trim()
     stage.description = data.description?.trim()
+    stage.isChapterPractice = data.isChapterPractice
 
     return { success: true }
   }

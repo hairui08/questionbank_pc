@@ -467,7 +467,7 @@ const filters: FilterChip[] = [
   { id: 'chapter', label: '章节分类' },
   { id: 'type', label: '题型分类' }
 ]
-const activeFilterId = ref<FilterChip['id']>('type')
+const activeFilterId = ref<FilterChip['id']>('chapter')
 const isChapterFilter = computed(() => activeFilterId.value === 'chapter')
 const isTypeFilter = computed(() => activeFilterId.value === 'type')
 function selectFilter(id: FilterChip['id']) {
@@ -1115,7 +1115,7 @@ watch(activeSubjectId, () => {
 }
 
 .tab-content {
-  padding: 32px 0 0;
+  padding: 26px 0 11px;
 }
 
 /* 页面标题 */

@@ -37,6 +37,77 @@
               </div>
             </div>
 
+            <!-- 试题基础信息 -->
+            <div class="form-section">
+              <h4>试题基础信息</h4>
+
+              <!-- 知识点选择（必填） -->
+              <div class="form-group required-field">
+                <label>关联知识点 <span class="required">*</span></label>
+                <div class="knowledge-point-input-wrapper">
+                  <div class="knowledge-point-display">
+                    <div v-if="selectedKnowledgePointNames.length > 0" class="selected-knowledge-points">
+                      <span
+                        v-for="(name, idx) in selectedKnowledgePointNames"
+                        :key="idx"
+                        class="knowledge-point-tag"
+                      >
+                        {{ name }}
+                        <button type="button" class="remove-tag-btn" @click="removeKnowledgePoint(idx)">×</button>
+                      </span>
+                    </div>
+                    <span v-else class="placeholder-text">暂未选择知识点（至少选择1个）</span>
+                  </div>
+                  <button type="button" class="btn-add-knowledge-point" @click="openKnowledgePointModal">
+                    添加知识点
+                  </button>
+                </div>
+              </div>
+
+              <!-- 四列网格布局 -->
+              <div class="form-row-grid">
+                <!-- 所属年份 -->
+                <div class="form-group">
+                  <label>所属年份</label>
+                  <select v-model="filter.year">
+                    <option value="">请选择年份</option>
+                    <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
+                  </select>
+                </div>
+
+                <!-- 试题难度 -->
+                <div class="form-group">
+                  <label>试题难度</label>
+                  <select v-model="filter.difficulty">
+                    <option value="easy">简单</option>
+                    <option value="medium">中等</option>
+                    <option value="hard">困难</option>
+                  </select>
+                </div>
+
+                <!-- 试题频次（必填） -->
+                <div class="form-group required-field">
+                  <label>试题频次 <span class="required">*</span></label>
+                  <select v-model="filter.frequency" required>
+                    <option value="">请选择频次</option>
+                    <option value="low">低频</option>
+                    <option value="medium">中频</option>
+                    <option value="high">高频</option>
+                  </select>
+                </div>
+
+                <!-- 收费规则 -->
+                <div class="form-group required-field">
+                  <label>收费规则 <span class="required">*</span></label>
+                  <select v-model="filter.paymentRuleId" required>
+                    <option value="t001">免费</option>
+                    <option value="t002">基础</option>
+                    <option value="t003">高级</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <!-- 组合题特殊区域 -->
             <div v-if="currentType === 'combination'" class="form-section">
               <h4>案例背景（大题干）</h4>
@@ -76,12 +147,11 @@
                   <div class="form-group">
                     <label>题型 <span class="required">*</span></label>
                     <select v-model="subQ.type" @change="onSubQuestionTypeChange(index)">
-                      <option value="single">单选题</option>
                       <option value="multiple">多选题</option>
                       <option value="judgment">判断题</option>
                       <option value="essay">简答题</option>
                     </select>
-                    <span class="form-hint">注意：组合题小问不支持不定项题型</span>
+                    <span class="form-hint">注意：组合题小问仅支持多选、判断、简答题型</span>
                   </div>
 
                   <!-- 小问题干 -->
@@ -97,9 +167,31 @@
 
                   <!-- 客观题选项 -->
                   <div v-if="isSubQuestionObjective(subQ.type)" class="form-group">
-                    <label>选项设置 <span class="required">*</span></label>
+                    <label>选项设置（请直接勾选正确答案） <span class="required">*</span></label>
                     <div class="options-container">
                       <div v-for="(opt, optIndex) in subQ.options" :key="opt.label" class="option-item">
+                        <!-- 答案选择器前置 -->
+                        <div class="answer-selector-inline">
+                          <!-- 单选题 -->
+                          <input
+                            v-if="subQ.type === 'single'"
+                            type="radio"
+                            :value="opt.label"
+                            v-model="subQ.answer"
+                            :name="`sub-answer-${index}`"
+                            :id="`sub-${index}-answer-${opt.label}`"
+                            class="answer-radio"
+                          >
+                          <!-- 多选题 -->
+                          <input
+                            v-else
+                            type="checkbox"
+                            :value="opt.label"
+                            v-model="subQ.answer"
+                            :id="`sub-${index}-answer-${opt.label}`"
+                            class="answer-checkbox"
+                          >
+                        </div>
                         <div class="option-label">{{ opt.label }}</div>
                         <input
                           type="text"
@@ -126,30 +218,15 @@
                     >
                       ➕ 添加选项
                     </button>
+                    <span class="form-hint">请直接勾选正确答案</span>
                   </div>
 
-                  <!-- 答案 -->
-                  <div class="form-group">
+                  <!-- 答案（判断题和简答题） -->
+                  <div v-if="subQ.type === 'judgment' || subQ.type === 'essay'" class="form-group">
                     <label>正确答案 <span class="required">*</span></label>
 
-                    <!-- 单选题答案 -->
-                    <div v-if="subQ.type === 'single'" class="answer-selector">
-                      <label v-for="opt in subQ.options" :key="opt.label" class="answer-option">
-                        <input type="radio" :value="opt.label" v-model="subQ.answer" :name="`sub-answer-${index}`">
-                        {{ opt.label }}
-                      </label>
-                    </div>
-
-                    <!-- 多选题答案 -->
-                    <div v-else-if="subQ.type === 'multiple'" class="answer-selector">
-                      <label v-for="opt in subQ.options" :key="opt.label" class="answer-option">
-                        <input type="checkbox" :value="opt.label" v-model="subQ.answer" :name="`sub-answer-${index}`">
-                        {{ opt.label }}
-                      </label>
-                    </div>
-
                     <!-- 判断题答案 -->
-                    <div v-else-if="subQ.type === 'judgment'" class="answer-selector">
+                    <div v-if="subQ.type === 'judgment'" class="answer-selector">
                       <label class="answer-option">
                         <input type="radio" value="true" v-model="subQ.answer" :name="`sub-answer-${index}`">
                         正确
@@ -193,19 +270,41 @@
                   <label>题干 <span class="required">*</span></label>
                   <textarea
                     v-model="questionForm.stem"
-                    placeholder="请输入题目内容..."
+                    placeholder="请输入题目内容...（输入完成后将自动识别题型）"
                     required
                     rows="6"
                     maxlength="5000"
+                    @blur="handleStemBlur"
                   ></textarea>
-                  <span class="form-hint">提示：可输入题目描述、背景材料等内容，最多5000字符</span>
+                  <span class="form-hint">提示：可输入题目描述、背景材料等内容，最多5000字符。系统将自动识别题型。</span>
                 </div>
 
                 <!-- 客观题选项 -->
                 <div v-if="isObjectiveQuestion" class="form-group">
-                  <label>选项设置 <span class="required">*</span></label>
+                  <label>选项设置（请直接勾选正确答案） <span class="required">*</span></label>
                   <div class="options-container">
                     <div v-for="(option, index) in options" :key="option.label" class="option-item">
+                      <!-- 答案选择器前置 -->
+                      <div class="answer-selector-inline">
+                        <!-- 单选题 -->
+                        <input
+                          v-if="currentType === 'single'"
+                          type="radio"
+                          :value="option.label"
+                          v-model="singleAnswer"
+                          :id="`answer-${option.label}`"
+                          class="answer-radio"
+                        >
+                        <!-- 多选题和不定项 -->
+                        <input
+                          v-else
+                          type="checkbox"
+                          :value="option.label"
+                          v-model="multipleAnswer"
+                          :id="`answer-${option.label}`"
+                          class="answer-checkbox"
+                        >
+                      </div>
                       <div class="option-label">{{ option.label }}</div>
                       <input
                         type="text"
@@ -233,34 +332,20 @@
                   >
                     ➕ 添加选项
                   </button>
-                  <span class="form-hint">提示：最少2个选项，最多10个选项，每个选项最多500字符</span>
+                  <span class="form-hint">提示：最少2个选项，最多10个选项，每个选项最多500字符。请直接勾选正确答案。</span>
                 </div>
               </div>
 
               <!-- 答案与解析 -->
               <div class="form-section">
                 <h4>答案与解析</h4>
-                <div class="form-group">
+
+                <!-- 判断题和简答题仍需要独立的答案区域 -->
+                <div v-if="currentType === 'judgment' || currentType === 'essay'" class="form-group">
                   <label>正确答案 <span class="required">*</span></label>
 
-                  <!-- 单选题答案 -->
-                  <div v-if="currentType === 'single'" class="answer-selector">
-                    <label v-for="option in options" :key="option.label" class="answer-option">
-                      <input type="radio" :value="option.label" v-model="singleAnswer">
-                      {{ option.label }}
-                    </label>
-                  </div>
-
-                  <!-- 多选题答案 -->
-                  <div v-else-if="currentType === 'multiple'" class="answer-selector">
-                    <label v-for="option in options" :key="option.label" class="answer-option">
-                      <input type="checkbox" :value="option.label" v-model="multipleAnswer">
-                      {{ option.label }}
-                    </label>
-                  </div>
-
                   <!-- 判断题答案 -->
-                  <div v-else-if="currentType === 'judgment'" class="answer-selector">
+                  <div v-if="currentType === 'judgment'" class="answer-selector">
                     <label class="answer-option">
                       <input type="radio" value="true" v-model="singleAnswer">
                       正确
@@ -268,14 +353,6 @@
                     <label class="answer-option">
                       <input type="radio" value="false" v-model="singleAnswer">
                       错误
-                    </label>
-                  </div>
-
-                  <!-- 不定项答案 -->
-                  <div v-else-if="currentType === 'uncertain'" class="answer-selector">
-                    <label v-for="option in options" :key="option.label" class="answer-option">
-                      <input type="checkbox" :value="option.label" v-model="multipleAnswer">
-                      {{ option.label }}
                     </label>
                   </div>
 
@@ -313,13 +390,25 @@
         </div>
       </div>
     </Transition>
+
+    <!-- 知识点选择弹窗 -->
+    <KnowledgePointSelectModal
+      :visible="knowledgePointModalVisible"
+      :project-id="projectId"
+      :subject-id="subjectId"
+      :selected-ids="selectedKnowledgePointIds"
+      @update:visible="knowledgePointModalVisible = $event"
+      @submit="handleKnowledgePointSelect"
+    />
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
-import type { QuestionType, QuestionOption, SubQuestion } from '@/views/question-management/types'
+import { useKnowledgePointStore } from '@/stores/knowledgePoint'
+import KnowledgePointSelectModal from '@/components/KnowledgePoint/KnowledgePointSelectModal.vue'
+import type { QuestionType, QuestionOption, SubQuestion, QuestionFrequency } from '@/views/question-management/types'
 import type { ExamQuestion, EmbeddedQuestionData } from '../types'
 
 interface Props {
@@ -337,11 +426,23 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const { showToast } = useToast()
+const knowledgePointStore = useKnowledgePointStore()
 
 // 筛选条件
 const filter = ref<{
   difficulty?: string
-}>({})
+  year?: number
+  frequency?: QuestionFrequency
+  paymentRuleId?: string
+}>({
+  difficulty: 'medium', // 默认中等难度
+  frequency: 'medium', // 默认中频
+  paymentRuleId: 't001' // 默认免费
+})
+
+// 知识点选择相关
+const knowledgePointModalVisible = ref(false)
+const selectedKnowledgePointIds = ref<string[]>([])
 
 // 题型列表
 const questionTypes = [
@@ -384,6 +485,24 @@ const isObjectiveQuestion = computed(() => {
   return ['single', 'multiple', 'uncertain'].includes(currentType.value)
 })
 
+// 知识点名称列表
+const selectedKnowledgePointNames = computed(() => {
+  return selectedKnowledgePointIds.value.map(id => {
+    const kp = knowledgePointStore.getKnowledgePointById(id)
+    return kp?.name || id
+  })
+})
+
+// 年份选项
+const yearOptions = computed(() => {
+  const currentYear = new Date().getFullYear()
+  const years: number[] = []
+  for (let year = currentYear + 5; year >= currentYear - 5; year--) {
+    years.push(year)
+  }
+  return years
+})
+
 // 选项管理
 function addOption() {
   if (options.value.length >= 10) return
@@ -403,7 +522,7 @@ function removeOption(index: number) {
 function addSubQuestion() {
   const newSubQuestion: SubQuestion = {
     id: Date.now().toString() + Math.random(),
-    type: 'single',
+    type: 'multiple', // 默认多选题（已移除单选题选项）
     stem: '',
     options: [
       { label: 'A', content: '' },
@@ -411,7 +530,7 @@ function addSubQuestion() {
       { label: 'C', content: '' },
       { label: 'D', content: '' }
     ],
-    answer: '',
+    answer: [], // 多选题默认空数组
     explanation: ''
   }
   subQuestions.value.push(newSubQuestion)
@@ -473,8 +592,93 @@ function removeSubQuestionOption(subQIndex: number, optIndex: number) {
   })
 }
 
+// 知识点选择相关方法
+function openKnowledgePointModal() {
+  knowledgePointModalVisible.value = true
+}
+
+function handleKnowledgePointSelect(ids: string[]) {
+  selectedKnowledgePointIds.value = ids
+  knowledgePointModalVisible.value = false
+}
+
+function removeKnowledgePoint(index: number) {
+  selectedKnowledgePointIds.value.splice(index, 1)
+}
+
+// 智能题型识别
+function detectQuestionType(stem: string): QuestionType | null {
+  if (!stem || stem.trim().length < 5) {
+    return null // 题干太短，无法准确识别
+  }
+
+  const stemLower = stem.toLowerCase()
+
+  // 判断题特征：对/错、正确/错误、是否、√/×
+  const judgmentKeywords = ['对错', '正确错误', '是否正确', '√', '×', '判断题', '判断下列', '判断以下']
+  if (judgmentKeywords.some(keyword => stemLower.includes(keyword))) {
+    return 'judgment'
+  }
+
+  // 组合题特征：案例、材料、根据以下、阅读
+  const combinationKeywords = ['案例分析', '根据材料', '阅读以下', '阅读下列', '根据以下材料', '组合题']
+  if (combinationKeywords.some(keyword => stemLower.includes(keyword))) {
+    return 'combination'
+  }
+
+  // 简答题特征：简述、论述、分析、解释、说明、阐述
+  const essayKeywords = ['简述', '论述', '分析', '解释说明', '阐述', '请说明', '请解释', '如何理解', '谈谈']
+  if (essayKeywords.some(keyword => stemLower.includes(keyword))) {
+    return 'essay'
+  }
+
+  // 多选题特征：多选、哪些、哪几项、全部
+  const multipleKeywords = ['多选题', '多选', '哪些', '哪几项', '全部正确', '全部错误', '都正确', '都错误']
+  if (multipleKeywords.some(keyword => stemLower.includes(keyword))) {
+    return 'multiple'
+  }
+
+  // 不定项特征：不定项、至少
+  const uncertainKeywords = ['不定项', '至少选择', '至少']
+  if (uncertainKeywords.some(keyword => stemLower.includes(keyword))) {
+    return 'uncertain'
+  }
+
+  // 单选题特征：选择、下列、以下、正确的是、错误的是
+  const singleKeywords = ['单选题', '选择题', '下列', '以下', '正确的是', '错误的是', '下面', '以上']
+  if (singleKeywords.some(keyword => stemLower.includes(keyword))) {
+    return 'single'
+  }
+
+  // 默认返回null，不改变当前题型
+  return null
+}
+
+// 题干失去焦点时自动识别题型
+function handleStemBlur() {
+  const detectedType = detectQuestionType(questionForm.value.stem)
+  if (detectedType && detectedType !== currentType.value) {
+    currentType.value = detectedType
+    showToast(`已自动识别为${questionTypes.find(t => t.value === detectedType)?.label}`, { type: 'success' })
+  }
+}
+
 // 表单验证
 function validateForm(): boolean {
+  // 新字段验证（所有题型共用）
+  if (selectedKnowledgePointIds.value.length === 0) {
+    showToast('请至少选择一个知识点', { type: 'error' })
+    return false
+  }
+  if (!filter.value.frequency) {
+    showToast('请选择试题频次', { type: 'error' })
+    return false
+  }
+  if (!filter.value.paymentRuleId) {
+    showToast('请选择收费规则', { type: 'error' })
+    return false
+  }
+
   // 组合题验证
   if (currentType.value === 'combination') {
     if (!mainStem.value.trim()) {
@@ -579,7 +783,11 @@ function buildExamQuestion(): ExamQuestion {
     stem: '',
     answer: '',
     explanation: '',
-    difficulty: filter.value.difficulty
+    knowledgePointIds: [...selectedKnowledgePointIds.value], // 必填
+    frequency: filter.value.frequency || 'medium', // 必填，默认中频
+    difficulty: filter.value.difficulty,
+    year: filter.value.year,
+    paymentRuleId: filter.value.paymentRuleId || 't001' // 必填，默认免费
   }
 
   // 组合题
@@ -646,8 +854,17 @@ function handleSaveAndNext() {
 
 // 重置表单
 function resetForm() {
-  filter.value = {}
+  // 重置筛选条件（保留默认值）
+  filter.value = {
+    difficulty: 'medium',
+    frequency: 'medium',
+    paymentRuleId: 't001'
+  }
+  // 重置知识点选择
+  selectedKnowledgePointIds.value = []
+  // 重置题型
   currentType.value = 'single'
+  // 重置题目内容
   questionForm.value = { stem: '', explanation: '' }
   singleAnswer.value = ''
   multipleAnswer.value = []
@@ -948,6 +1165,28 @@ watch(currentType, () => {
   gap: 12px;
 }
 
+/* 答案选择器内联样式 */
+.answer-selector-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.answer-radio,
+.answer-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.answer-radio:hover,
+.answer-checkbox:hover {
+  transform: scale(1.1);
+}
+
 .option-label {
   width: 32px;
   height: 32px;
@@ -1177,5 +1416,115 @@ watch(currentType, () => {
 .drawer-enter-from .drawer-content,
 .drawer-leave-to .drawer-content {
   transform: translateX(100%);
+}
+
+/* 知识点选择相关样式 */
+.knowledge-point-input-wrapper {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.knowledge-point-display {
+  flex: 1;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid #cdd5e0;
+  border-radius: 6px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+}
+
+.selected-knowledge-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.knowledge-point-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: linear-gradient(180deg, #e6f2ff 0%, #d9ebff 100%);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.remove-tag-btn {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.remove-tag-btn:hover {
+  background: rgba(0, 102, 204, 0.2);
+}
+
+.btn-add-knowledge-point {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: #ffffff;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-add-knowledge-point:hover {
+  background: var(--row-hover);
+  border-color: var(--accent-hover);
+}
+
+.placeholder-text {
+  font-size: 13px;
+  color: var(--secondary-text);
+  font-style: italic;
+}
+
+/* 四列网格布局 */
+.form-row-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+@media (max-width: 1200px) {
+  .form-row-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .form-row-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 必填字段标识 */
+.required-field label .required {
+  color: #d54a3c;
+  margin-left: 2px;
+  font-weight: 700;
 }
 </style>

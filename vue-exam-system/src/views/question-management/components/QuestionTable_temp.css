@@ -1,0 +1,42 @@
+
+/* Enhanced table wrapper */
+.question-table-wrapper {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Enhanced row transition */
+.question-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+/* Enhanced row hover */
+.question-table tbody tr:hover {
+  transform: scale(1.001);
+}
+
+/* Enhanced frequency badges with gradients */
+.frequency-low {
+  background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%) !important;
+  color: #0d4d3f !important;
+  box-shadow: 0 2px 4px rgba(132, 250, 176, 0.3);
+}
+
+.frequency-medium {
+  background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%) !important;
+  color: #5a3e06 !important;
+  box-shadow: 0 2px 4px rgba(255, 234, 167, 0.4);
+}
+
+.frequency-high {
+  background: linear-gradient(135deg, #ff7675 0%, #d63031 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(255, 118, 117, 0.4);
+}
+
+/* Enhanced badge border-radius */
+.type-badge,
+.frequency-badge,
+.payment-badge,
+.status-badge {
+  border-radius: 12px;
+}

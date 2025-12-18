@@ -18,27 +18,10 @@
           <span class="type-name">{{ group.typeName }}</span>
         </div>
 
-        <!-- 统一操作栏: 统计信息 + 批量设分 + 上下移动 -->
+        <!-- 统一操作栏: 统计信息 + 上下移动 -->
         <div class="type-controls">
           <div class="type-stats">
             共{{ group.count }}题 / 总{{ group.totalScore }}分 / 每题{{ group.avgScore }}分
-          </div>
-
-          <div class="batch-score-setter">
-            <label>批量设分:</label>
-            <input
-              v-model.number="batchScores[group.type]"
-              type="number"
-              min="1"
-              placeholder="分值"
-              @click="stopPropagation"
-            />
-            <button
-              class="apply-btn"
-              @click="handleBatchSetScore(group.type, $event)"
-            >
-              应用
-            </button>
           </div>
 
           <div class="type-actions">
@@ -77,7 +60,6 @@ interface Props {
 interface Emits {
   (e: 'scroll-to-type', type: string): void
   (e: 'scroll-to-question', questionId: string): void
-  (e: 'batch-update-score', type: string, score: number): void
   (e: 'move-type-up', type: string): void
   (e: 'move-type-down', type: string): void
 }
@@ -137,25 +119,6 @@ function scrollToType(type: string) {
 // 滚动到题目
 function scrollToQuestion(questionId: string) {
   emit('scroll-to-question', questionId)
-}
-
-// 批量设置分值的输入值 (按题型存储)
-const batchScores = ref<Record<string, number>>({})
-
-// 处理批量设置分值
-function handleBatchSetScore(type: string, event: Event) {
-  event.stopPropagation() // 阻止事件冒泡到 type-header
-  const score = batchScores.value[type]
-  if (score && score > 0) {
-    emit('batch-update-score', type, score)
-    // 清空输入框
-    batchScores.value[type] = 0
-  }
-}
-
-// 阻止输入框点击事件冒泡
-function stopPropagation(event: Event) {
-  event.stopPropagation()
 }
 
 // 题型上移
@@ -252,14 +215,7 @@ function handleMoveTypeDown(type: string, event: Event) {
   color: var(--primary-text);
   font-weight: 500;
   white-space: nowrap;
-}
-
-.batch-score-setter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   flex: 1;
-  min-width: 180px;
 }
 
 .type-actions {
@@ -287,45 +243,5 @@ function handleMoveTypeDown(type: string, event: Event) {
 .type-move-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-}
-
-.batch-score-setter label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--primary-text);
-  white-space: nowrap;
-}
-
-.batch-score-setter input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  font-size: 13px;
-  text-align: center;
-  min-width: 60px;
-}
-
-.batch-score-setter input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.apply-btn {
-  padding: 6px 14px;
-  background: linear-gradient(180deg, #4f77ff 0%, #2f57e3 100%);
-  color: #ffffff;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.apply-btn:hover {
-  background: linear-gradient(180deg, #4b6ee6 0%, #264acc 100%);
-  transform: scale(1.05);
 }
 </style>

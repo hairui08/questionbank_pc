@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useProjectStore } from './project'
 import { useChapterStore } from './chapter'
 import { useQuestionStore } from './question'
-import type { KnowledgePoint, KnowledgePointFormData, ProjectTreeNode } from '@/views/knowledge-point-management/types'
+import type { KnowledgePoint, KnowledgePointFormData, ProjectTreeNode, ChapterTreeNode, SectionTreeNode } from '@/views/knowledge-point-management/types'
 
 export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
   const projectStore = useProjectStore()
@@ -12,142 +12,98 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
 
   // Mock数据
   const knowledgePoints = ref<KnowledgePoint[]>([
-    // 财务战略管理 (s1) - 8个知识点
+    // 高级会计师 - 财务战略管理 (s1) - 章节练习 (ch-002)
+    // 第一章 财务战略概述 (sec-001)
     {
       id: 'kp-001',
       subjectId: 's1',
-      name: '会计核算基本前提',
-      chapterIds: ['ch-001'],
-      createTime: '2024-10-01T10:00:00.000Z',
-      creatorId: 'admin',
+      name: '战略定义与特征',
+      chapterIds: ['sec-001'],
+      difficultyLevel: 3,
+      frequencyLevel: 4,
+      createTime: '2025-01-10T12:00:00Z',
+      creatorId: 'user-001',
       status: 'active'
     },
     {
       id: 'kp-002',
       subjectId: 's1',
-      name: '财务报表分析方法',
-      chapterIds: ['ch-002', 'ch-003'],
-      createTime: '2024-10-02T10:00:00.000Z',
-      creatorId: 'admin',
+      name: '战略类型与选择',
+      chapterIds: ['sec-001'],
+      difficultyLevel: 4,
+      frequencyLevel: 5,
+      createTime: '2025-01-10T12:05:00Z',
+      creatorId: 'user-001',
       status: 'active'
     },
     {
       id: 'kp-003',
       subjectId: 's1',
-      name: '现金流量管理',
-      chapterIds: ['ch-002'],
-      createTime: '2024-10-03T10:00:00.000Z',
-      creatorId: 'editor',
+      name: '战略实施与控制',
+      chapterIds: ['sec-001'],
+      difficultyLevel: 5,
+      frequencyLevel: 4,
+      createTime: '2025-01-10T12:10:00Z',
+      creatorId: 'user-001',
+      status: 'active'
+    },
+    
+    // 第二章 预算管理 (sec-002)
+    {
+      id: 'kp-004',
+      subjectId: 's1',
+      name: '预算编制方法',
+      chapterIds: ['sec-002'],
+      difficultyLevel: 3,
+      frequencyLevel: 5,
+      createTime: '2025-01-10T12:15:00Z',
+      creatorId: 'user-001',
+      status: 'active'
+    },
+    {
+      id: 'kp-005',
+      subjectId: 's1',
+      name: '预算控制与分析',
+      chapterIds: ['sec-002'],
+      difficultyLevel: 4,
+      frequencyLevel: 4,
+      createTime: '2025-01-10T12:20:00Z',
+      creatorId: 'user-001',
       status: 'active'
     },
     {
       id: 'kp-006',
       subjectId: 's1',
-      name: '投资决策分析',
-      chapterIds: ['ch-001'],
-      createTime: '2024-10-06T10:00:00.000Z',
-      creatorId: 'admin',
+      name: '预算执行与调整',
+      chapterIds: ['sec-002'],
+      difficultyLevel: 4,
+      frequencyLevel: 3,
+      createTime: '2025-01-10T12:25:00Z',
+      creatorId: 'user-001',
       status: 'active'
     },
+    
+    // 第三章 成本分析 (sec-003)
     {
       id: 'kp-007',
       subjectId: 's1',
-      name: '资本结构优化',
-      chapterIds: ['ch-002'],
-      createTime: '2024-10-07T10:00:00.000Z',
-      creatorId: 'admin',
+      name: '成本核算方法',
+      chapterIds: ['sec-003'],
+      difficultyLevel: 4,
+      frequencyLevel: 5,
+      createTime: '2025-01-10T12:30:00Z',
+      creatorId: 'user-001',
       status: 'active'
     },
     {
       id: 'kp-008',
       subjectId: 's1',
-      name: '风险管理策略',
-      chapterIds: ['ch-003'],
-      createTime: '2024-10-08T10:00:00.000Z',
-      creatorId: 'editor',
-      status: 'active'
-    },
-    {
-      id: 'kp-009',
-      subjectId: 's1',
-      name: '绩效评价体系',
-      chapterIds: ['ch-001', 'ch-002'],
-      createTime: '2024-10-09T10:00:00.000Z',
-      creatorId: 'admin',
-      status: 'active'
-    },
-    {
-      id: 'kp-010',
-      subjectId: 's1',
-      name: '企业并购重组',
-      chapterIds: ['ch-003'],
-      createTime: '2024-10-10T10:00:00.000Z',
-      creatorId: 'editor',
-      status: 'active'
-    },
-
-    // 税务风险控制 (s2) - 7个知识点
-    {
-      id: 'kp-004',
-      subjectId: 's2',
-      name: '税务风险识别',
-      chapterIds: ['ch-004'],
-      createTime: '2024-10-04T10:00:00.000Z',
-      creatorId: 'admin',
-      status: 'active'
-    },
-    {
-      id: 'kp-005',
-      subjectId: 's2',
-      name: '税收优惠政策',
-      chapterIds: [],
-      createTime: '2024-10-05T10:00:00.000Z',
-      creatorId: 'editor',
-      status: 'active'
-    },
-    {
-      id: 'kp-011',
-      subjectId: 's2',
-      name: '增值税管理',
-      chapterIds: ['ch-004'],
-      createTime: '2024-10-11T10:00:00.000Z',
-      creatorId: 'admin',
-      status: 'active'
-    },
-    {
-      id: 'kp-012',
-      subjectId: 's2',
-      name: '所得税管理',
-      chapterIds: ['ch-005'],
-      createTime: '2024-10-12T10:00:00.000Z',
-      creatorId: 'admin',
-      status: 'active'
-    },
-    {
-      id: 'kp-013',
-      subjectId: 's2',
-      name: '税务稽查应对',
-      chapterIds: ['ch-005'],
-      createTime: '2024-10-13T10:00:00.000Z',
-      creatorId: 'editor',
-      status: 'active'
-    },
-    {
-      id: 'kp-014',
-      subjectId: 's2',
-      name: '国际税收',
-      chapterIds: ['ch-006'],
-      createTime: '2024-10-14T10:00:00.000Z',
-      creatorId: 'admin',
-      status: 'active'
-    },
-    {
-      id: 'kp-015',
-      subjectId: 's2',
-      name: '税务内控体系',
-      chapterIds: ['ch-006'],
-      createTime: '2024-10-15T10:00:00.000Z',
-      creatorId: 'editor',
+      name: '成本控制技术',
+      chapterIds: ['sec-003'],
+      difficultyLevel: 5,
+      frequencyLevel: 4,
+      createTime: '2025-01-10T12:35:00Z',
+      creatorId: 'user-001',
       status: 'active'
     }
   ])
@@ -165,8 +121,54 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
           id: subject.id,
           projectId: subject.projectId,
           projectName: subject.projectName,
-          name: subject.name
+          name: subject.name,
+          chapters: []
         }))
+    }))
+  })
+
+  /**
+   * 项目树数据（包含章节、小节）- 用于知识点管理页面的四级导航
+   */
+  const projectTreeWithChapters = computed<ProjectTreeNode[]>(() => {
+    return projectStore.projects.map(project => ({
+      id: project.id,
+      name: project.name,
+      subjects: projectStore.subjects
+        .filter(subject => subject.projectId === project.id)
+        .map(subject => {
+          // 获取该科目下的章节练习
+          const chapterPractice = chapterStore.chapters.find(
+            chapter => chapter.subjectId === subject.id && chapter.isChapterPractice === true
+          )
+          
+          // 如果有章节练习，直接展示其下的小节作为章节
+          let chapters = []
+          if (chapterPractice) {
+            chapters = chapterStore.sections
+              .filter(section => section.chapterId === chapterPractice.id)
+              .map(section => ({
+                id: section.id,
+                subjectId: subject.id,
+                name: section.name,
+                sections: chapterStore.subSections
+                  .filter(subSection => subSection.sectionId === section.id)
+                  .map(subSection => ({
+                    id: subSection.id,
+                    chapterId: section.id,
+                    name: subSection.name
+                  }))
+              }))
+          }
+          
+          return {
+            id: subject.id,
+            projectId: subject.projectId,
+            projectName: subject.projectName,
+            name: subject.name,
+            chapters
+          }
+        })
     }))
   })
 
@@ -247,9 +249,11 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
       subjectId: data.subjectId,
       name: data.name.trim(),
       chapterIds: data.chapterIds || [],
+      difficultyLevel: data.difficultyLevel,
+      frequencyLevel: data.frequencyLevel,
       createTime: new Date().toISOString(),
       creatorId: 'user-001',
-      status: 'active'
+      status: 'active'  // 默认启用
     }
 
     knowledgePoints.value.push(newKnowledgePoint)
@@ -284,7 +288,9 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
     knowledgePoints.value[index] = {
       ...currentKp,
       name: data.name ? data.name.trim() : currentKp.name,
-      chapterIds: data.chapterIds !== undefined ? data.chapterIds : currentKp.chapterIds
+      chapterIds: data.chapterIds !== undefined ? data.chapterIds : currentKp.chapterIds,
+      difficultyLevel: data.difficultyLevel !== undefined ? data.difficultyLevel : currentKp.difficultyLevel,
+      frequencyLevel: data.frequencyLevel !== undefined ? data.frequencyLevel : currentKp.frequencyLevel
     }
   }
 
@@ -319,6 +325,37 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
 
     const currentStatus = knowledgePoints.value[index].status
     knowledgePoints.value[index].status = currentStatus === 'active' ? 'disabled' : 'active'
+  }
+
+  /**
+   * 软删除知识点（不从数据中移除，仅标记为已删除）
+   */
+  const deleteKnowledgePointSoft = (id: string, reason?: string): boolean => {
+    const kp = knowledgePoints.value.find(k => k.id === id)
+    if (kp) {
+      kp.status = 'deleted'
+      kp.deprecatedReason = reason
+      kp.deprecatedDate = new Date().toISOString()
+      return true
+    }
+    return false
+  }
+
+  /**
+   * 标记知识点为过时
+   */
+  const deprecateKnowledgePoint = (id: string, reason: string, replacedBy?: string): boolean => {
+    const kp = knowledgePoints.value.find(k => k.id === id)
+    if (kp) {
+      kp.status = 'deprecated'
+      kp.deprecatedReason = reason
+      kp.deprecatedDate = new Date().toISOString()
+      if (replacedBy) {
+        kp.replacedBy = replacedBy
+      }
+      return true
+    }
+    return false
   }
 
   /**
@@ -459,9 +496,39 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
     )
   }
 
+  /**
+   * 批量切换知识点状态
+   */
+  const batchToggleStatus = (ids: string[], targetStatus: 'active' | 'disabled'): void => {
+    ids.forEach(id => {
+      const kp = knowledgePoints.value.find(k => k.id === id)
+      if (kp) {
+        kp.status = targetStatus
+      }
+    })
+  }
+
+  /**
+   * 批量删除知识点
+   */
+  const batchDelete = (ids: string[]): void => {
+    // 1. 批量删除知识点
+    knowledgePoints.value = knowledgePoints.value.filter(kp => !ids.includes(kp.id))
+
+    // 2. 一次性清理所有试题关联
+    questionStore.mockQuestions.forEach(question => {
+      if (question.knowledgePointIds) {
+        question.knowledgePointIds = question.knowledgePointIds.filter(
+          kpId => !ids.includes(kpId)
+        )
+      }
+    })
+  }
+
   return {
     knowledgePoints,
     projectTree,
+    projectTreeWithChapters,
     getKnowledgePointsBySubject,
     getKnowledgePointById,
     getQuestionCountByKnowledgePoint,
@@ -471,6 +538,10 @@ export const useKnowledgePointStore = defineStore('knowledgePoint', () => {
     updateKnowledgePoint,
     deleteKnowledgePoint,
     toggleKnowledgePointStatus,
+    deleteKnowledgePointSoft,
+    deprecateKnowledgePoint,
+    batchToggleStatus,
+    batchDelete,
     getChapterNamesByIds,
     getChapterDetailsByIds,
     getChapterNamesOnly,

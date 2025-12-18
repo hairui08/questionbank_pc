@@ -32,7 +32,6 @@
                   <th>状态</th>
                   <th>排序</th>
                   <th>添加时间</th>
-                  <th>年份</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -40,7 +39,9 @@
                 <template v-for="(project, index) in filteredProjects" :key="project.id">
                   <tr
                     class="project-row"
-                    :class="{ 'is-expanded': expandedProjects.has(project.id) }"
+                    :class="{
+                      'is-expanded': expandedProjects.has(project.id)
+                    }"
                     @click="toggleProject(project.id)"
                   >
                     <td @click.stop>
@@ -61,17 +62,32 @@
                     </td>
                     <td>{{ project.order }}</td>
                     <td>{{ project.createdAt }}</td>
-                    <td>{{ project.year }}</td>
                     <td @click.stop>
                       <div class="action-group">
+                        <button
+                          class="btn icon-btn"
+                          :disabled="index === 0"
+                          @click="moveProjectUp(index)"
+                          title="上移"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          class="btn icon-btn"
+                          :disabled="index === filteredProjects.length - 1"
+                          @click="moveProjectDown(index)"
+                          title="下移"
+                        >
+                          ↓
+                        </button>
                         <button
                           class="btn primary"
                           :disabled="project.status === 'disabled'"
                           @click="openAddSubjectModal(project)"
                         >
-                          添加
+                          添加科目
                         </button>
-                        <button class="btn secondary">编辑</button>
+                        <button class="btn secondary" @click="openEditProjectModal(project)">编辑</button>
                         <button
                           class="btn secondary"
                           @click="handleToggleProjectStatus(project)"
@@ -87,7 +103,7 @@
                     v-if="expandedProjects.has(project.id)"
                     class="subject-row is-visible"
                   >
-                    <td colspan="7">
+                    <td colspan="6">
                       <div class="subject-inline-panel">
                         <header>
                           {{ project.name }}科目
@@ -98,17 +114,26 @@
                             v-for="subject in getProjectSubjects(project.id)"
                             :key="subject.id"
                             class="subject-item"
+                            :class="{
+                              'is-dragging': draggedSubjectId === subject.id,
+                              'is-drag-over': dragOverSubjectId === subject.id
+                            }"
+                            draggable="true"
+                            @dragstart="handleSubjectDragStart($event, subject.id)"
+                            @dragover="handleSubjectDragOver($event, subject.id)"
+                            @dragleave="handleSubjectDragLeave"
+                            @drop="handleSubjectDrop($event, subject.id)"
+                            @dragend="handleSubjectDragEnd"
                           >
                             <div class="meta">
                               <strong>{{ subject.name }}</strong>
                               <span>
                                 {{ subject.status === 'active' ? '启用' : '禁用' }} ·
-                                排序 {{ subject.order }} ·
-                                {{ subject.year }}
+                                排序 {{ subject.order }}
                               </span>
                             </div>
                             <div class="actions">
-                              <button class="btn secondary">编辑</button>
+                              <button class="btn secondary" @click="openEditSubjectModal(subject)">编辑</button>
                               <button
                                 class="btn secondary"
                                 @click="handleToggleSubjectStatus(subject)"
@@ -155,7 +180,7 @@
               <div class="requirement-section">
                 <h4>用户场景</h4>
                 <ul>
-                  <li><strong>创建新项目</strong>: 系统管理员创建新的考试项目(如"2025年注册会计师考试"),设置年份和基本信息</li>
+                  <li><strong>创建新项目</strong>: 系统管理员创建新的考试项目(如"注册会计师考试"),设置基本信息(名称、状态、排序)</li>
                   <li><strong>添加科目</strong>: 在项目下添加多个科目(如"会计"、"审计"、"财务成本管理"),为每个科目设置独立的状态和排序</li>
                   <li><strong>状态管理</strong>: 禁用过期项目,保留历史数据但阻止新增科目,启用当年项目开放所有操作</li>
                   <li><strong>批量维护</strong>: 勾选项目复选框后,使用批量操作工具条一次调整多个项目的状态或排序</li>
@@ -166,8 +191,8 @@
               <div class="requirement-section">
                 <h4>核心数据流</h4>
                 <ul>
-                  <li><strong>创建项目流程</strong>: 点击【新增项目】→ 填写项目名称和年份 → 校验唯一性 → 保存成功并添加到列表顶部</li>
-                  <li><strong>添加科目流程</strong>: 点击项目行【添加】按钮 → 填写科目名称、状态、年份、排序 → 校验唯一性(项目内) → 保存成功并自动展开该项目显示新科目</li>
+                  <li><strong>创建项目流程</strong>: 点击【新增项目】→ 填写项目名称、状态、排序 → 校验唯一性 → 保存成功并添加到列表顶部</li>
+                  <li><strong>添加科目流程</strong>: 点击项目行【添加科目】按钮 → 填写科目名称、状态、排序 → 校验唯一性(项目内) → 保存成功并自动展开该项目显示新科目</li>
                   <li><strong>状态管理流程</strong>: 禁用项目后【添加】按钮变灰,提示"项目已禁用,无法新增科目",但保留编辑和查看功能</li>
                   <li><strong>唯一性校验</strong>: 项目名称全局唯一,科目名称项目内唯一,保存时自动检查</li>
                   <li><strong>折叠交互</strong>: 点击项目行展开/收起科目列表,仅展开一个项目(单选模式),提供全部展开/收起快捷按钮</li>
@@ -182,7 +207,6 @@
                   <li><strong>项目名称唯一性</strong>: 全局范围内项目名称不能重复</li>
                   <li><strong>科目名称唯一性</strong>: 同一项目下科目名称不能重复,不同项目可重复</li>
                   <li><strong>状态约束</strong>: 禁用项目不可新增科目,但可编辑现有科目和项目信息</li>
-                  <li><strong>年份约束</strong>: 项目和科目的年份必须 ≥ 当年,默认为当年,格式YYYY</li>
                   <li><strong>排序规则</strong>: 排序字段必须为正整数(>0),默认自动递增,用户可手动调整</li>
                   <li><strong>批量操作约束</strong>: 批量操作仅对选中项目生效,混合启用/禁用时按所选操作统一处理,执行前需弹出确认提示</li>
                   <li><strong>删除保护</strong>: 操作列提供【删除】按钮,点击后弹出二次确认;确认后级联删除该项目及其下所有科目</li>
@@ -207,13 +231,13 @@
                   <tr>
                     <td>项目表格</td>
                     <td>动态添加项目名称的可滚动表格</td>
-                    <td>包含选择、项目名称、状态、排序、添加时间、年份、操作列</td>
+                    <td>包含序号、项目名称、状态、排序、添加时间、操作列</td>
                     <td>P0</td>
                   </tr>
                   <tr>
                     <td>状态筛选</td>
                     <td>筛选启用/禁用项目</td>
-                    <td>默认"启用"，实时更新列表</td>
+                    <td>默认"全部"，实时更新列表</td>
                     <td>P0</td>
                   </tr>
                   <tr>
@@ -249,7 +273,7 @@
                   <tr>
                     <td>新增科目流程</td>
                     <td>新增科目弹窗校验</td>
-                    <td>名称唯一、状态可调、年份≥当年、排序正整数</td>
+                    <td>名称唯一、状态可调、排序正整数</td>
                     <td>P0</td>
                   </tr>
                   <tr>
@@ -315,15 +339,6 @@
                     <td>正整数</td>
                   </tr>
                   <tr>
-                    <td>年份</td>
-                    <td>Integer</td>
-                    <td>≥当年</td>
-                    <td>✓</td>
-                    <td>无</td>
-                    <td>当年</td>
-                    <td>YYYY格式</td>
-                  </tr>
-                  <tr>
                     <td>添加时间</td>
                     <td>DateTime</td>
                     <td>标准时间戳</td>
@@ -360,7 +375,7 @@
                       <td>AC-01</td>
                       <td>用户打开项目管理页面</td>
                       <td>页面加载完成</td>
-                      <td>筛选下拉框默认选中"启用"，仅显示启用状态的项目</td>
+                      <td>筛选下拉框默认选中"全部"，显示所有状态的项目</td>
                     </tr>
                     <tr>
                       <td>AC-02</td>
@@ -389,8 +404,8 @@
                     <tr>
                       <td>AC-06</td>
                       <td>用户点击【新增项目】按钮</td>
-                      <td>输入项目名称"2025年注册会计师考试",但该名称已存在</td>
-                      <td>系统提示"该项目名称已存在",拒绝保存</td>
+                      <td>输入项目名称"注册会计师考试",但该名称已存在</td>
+                      <td>系统提示"项目名称已存在，请使用不同的名称",拒绝保存</td>
                     </tr>
                     <tr>
                       <td>AC-07</td>
@@ -413,8 +428,8 @@
                     <tr>
                       <td>AC-10</td>
                       <td>用户点击项目行【编辑】按钮</td>
-                      <td>修改项目名称、年份或状态后保存</td>
-                      <td>项目信息更新成功,Toast提示"项目编辑成功"</td>
+                      <td>修改项目名称或状态后保存</td>
+                      <td>项目信息更新成功,Toast提示"项目已成功编辑"</td>
                     </tr>
                     <tr>
                       <td>AC-11</td>
@@ -430,12 +445,6 @@
                     </tr>
                     <tr>
                       <td>AC-13</td>
-                      <td>用户创建项目时设置年份为2023(小于当年2025)</td>
-                      <td>点击保存</td>
-                      <td>系统提示"年份不能小于当年(2025)",拒绝保存</td>
-                    </tr>
-                    <tr>
-                      <td>AC-14</td>
                       <td>用户添加科目时设置排序为0</td>
                       <td>点击保存</td>
                       <td>系统提示"排序必须为正整数(>0)",拒绝保存</td>
@@ -500,17 +509,19 @@
       </template>
     </TabNavigation>
 
-    <!-- 新增项目弹窗 -->
+    <!-- 新增/编辑项目弹窗 -->
     <AddProjectModal
       v-model:visible="addProjectModalVisible"
+      :editing-project="editingProject"
       @submit="handleAddProject"
     />
 
-    <!-- 新增科目弹窗 -->
+    <!-- 新增/编辑科目弹窗 -->
     <AddSubjectModal
       v-model:visible="addSubjectModalVisible"
       :project-id="selectedProjectId"
       :project-name="selectedProjectName"
+      :editing-subject="editingSubject"
       @submit="handleAddSubject"
     />
 
@@ -547,7 +558,7 @@ const projectStore = useProjectStore()
 const { showToast } = useToast()
 
 // 状态筛选
-const statusFilter = ref('active')
+const statusFilter = ref('all')
 
 // 展开的项目
 const expandedProjects = ref<Set<string>>(new Set())
@@ -555,11 +566,19 @@ const expandedProjects = ref<Set<string>>(new Set())
 // 全部展开状态
 const allExpanded = ref(false)
 
+// 科目拖拽相关状态
+const draggedSubjectId = ref<string | null>(null)
+const dragOverSubjectId = ref<string | null>(null)
+
 // 弹窗状态
 const addProjectModalVisible = ref(false)
 const addSubjectModalVisible = ref(false)
 const selectedProjectId = ref('')
 const selectedProjectName = ref('')
+
+// 编辑状态
+const editingProject = ref<Project | null>(null)
+const editingSubject = ref<Subject | null>(null)
 
 // 启用/禁用确认弹窗相关状态
 const isToggleStatusModalVisible = ref(false)
@@ -571,10 +590,12 @@ const pendingToggleSubject = ref<Subject | null>(null)
 
 // 筛选后的项目列表
 const filteredProjects = computed(() => {
-  if (statusFilter.value === 'all') {
-    return projectStore.projects
+  let projects = projectStore.projects
+  if (statusFilter.value !== 'all') {
+    projects = projects.filter(p => p.status === statusFilter.value)
   }
-  return projectStore.projects.filter(p => p.status === statusFilter.value)
+  // 按order排序
+  return [...projects].sort((a, b) => a.order - b.order)
 })
 
 // 获取项目的科目列表
@@ -603,32 +624,158 @@ const toggleAllProjects = () => {
   allExpanded.value = !allExpanded.value
 }
 
+// 上移项目
+const moveProjectUp = (index: number) => {
+  if (index === 0) return  // 首项无法上移
+
+  const currentProject = filteredProjects.value[index]
+  const prevProject = filteredProjects.value[index - 1]
+
+  // 调用 store 方法交换 order
+  projectStore.reorderProjects(currentProject.id, prevProject.id)
+  showToast('项目已上移')
+}
+
+// 下移项目
+const moveProjectDown = (index: number) => {
+  if (index === filteredProjects.value.length - 1) return  // 末项无法下移
+
+  const currentProject = filteredProjects.value[index]
+  const nextProject = filteredProjects.value[index + 1]
+
+  // 调用 store 方法交换 order
+  projectStore.reorderProjects(currentProject.id, nextProject.id)
+  showToast('项目已下移')
+}
+
+// 上移科目
+const moveSubjectUp = (projectId: string, subjectIndex: number) => {
+  const subjects = getProjectSubjects(projectId)
+  if (subjectIndex === 0) return  // 首项无法上移
+
+  const currentSubject = subjects[subjectIndex]
+  const prevSubject = subjects[subjectIndex - 1]
+
+  // 调用 store 方法交换 order
+  projectStore.reorderSubjects(currentSubject.id, prevSubject.id)
+  showToast('科目已上移')
+}
+
+// 下移科目
+const moveSubjectDown = (projectId: string, subjectIndex: number) => {
+  const subjects = getProjectSubjects(projectId)
+  if (subjectIndex === subjects.length - 1) return  // 末项无法下移
+
+  const currentSubject = subjects[subjectIndex]
+  const nextSubject = subjects[subjectIndex + 1]
+
+  // 调用 store 方法交换 order
+  projectStore.reorderSubjects(currentSubject.id, nextSubject.id)
+  showToast('科目已下移')
+}
+
+// 科目拖拽开始
+const handleSubjectDragStart = (e: DragEvent, subjectId: string) => {
+  draggedSubjectId.value = subjectId
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+  }
+}
+
+// 科目拖拽悬停
+const handleSubjectDragOver = (e: DragEvent, subjectId: string) => {
+  e.preventDefault()
+  dragOverSubjectId.value = subjectId
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'move'
+  }
+}
+
+// 科目拖拽离开
+const handleSubjectDragLeave = () => {
+  dragOverSubjectId.value = null
+}
+
+// 科目放置
+const handleSubjectDrop = (e: DragEvent, targetSubjectId: string) => {
+  e.preventDefault()
+  if (!draggedSubjectId.value || draggedSubjectId.value === targetSubjectId) {
+    draggedSubjectId.value = null
+    dragOverSubjectId.value = null
+    return
+  }
+
+  // 调用 store 方法交换 order
+  projectStore.reorderSubjects(draggedSubjectId.value, targetSubjectId)
+
+  // 重置拖拽状态
+  draggedSubjectId.value = null
+  dragOverSubjectId.value = null
+}
+
+// 科目拖拽结束
+const handleSubjectDragEnd = () => {
+  draggedSubjectId.value = null
+  dragOverSubjectId.value = null
+}
+
 // 打开新增项目弹窗
 const openAddProjectModal = () => {
+  editingProject.value = null
+  addProjectModalVisible.value = true
+}
+
+// 打开编辑项目弹窗
+const openEditProjectModal = (project: Project) => {
+  editingProject.value = project
   addProjectModalVisible.value = true
 }
 
 // 打开新增科目弹窗
 const openAddSubjectModal = (project: Project) => {
+  editingSubject.value = null
   selectedProjectId.value = project.id
   selectedProjectName.value = project.name
   addSubjectModalVisible.value = true
 }
 
-// 处理新增项目
-const handleAddProject = (data: ProjectFormData) => {
-  projectStore.addProject(data)
-  showToast(`项目"${data.name}"已成功创建。`)
+// 打开编辑科目弹窗
+const openEditSubjectModal = (subject: Subject) => {
+  editingSubject.value = subject
+  selectedProjectId.value = subject.projectId
+  selectedProjectName.value = subject.projectName
+  addSubjectModalVisible.value = true
 }
 
-// 处理新增科目
-const handleAddSubject = (data: SubjectFormData) => {
-  projectStore.addSubject(data)
-  showToast('新增科目成功，已同步至对应项目。')
+// 处理新增/编辑项目
+const handleAddProject = (data: ProjectFormData) => {
+  if (editingProject.value) {
+    // 编辑模式
+    projectStore.updateProject(editingProject.value.id, data)
+    showToast(`项目"${data.name}"已成功编辑。`)
+    editingProject.value = null
+  } else {
+    // 新增模式
+    projectStore.addProject(data)
+    showToast(`项目"${data.name}"已成功创建。`)
+  }
+}
 
-  // 自动展开该项目
-  expandedProjects.value.clear()
-  expandedProjects.value.add(data.projectId)
+// 处理新增/编辑科目
+const handleAddSubject = (data: SubjectFormData) => {
+  if (editingSubject.value) {
+    // 编辑模式
+    projectStore.updateSubject(editingSubject.value.id, data)
+    showToast(`科目"${data.name}"已成功编辑。`)
+    editingSubject.value = null
+  } else {
+    // 新增模式
+    projectStore.addSubject(data)
+    showToast('新增科目成功，已同步至对应项目。')
+    // 自动展开该项目
+    expandedProjects.value.clear()
+    expandedProjects.value.add(data.projectId)
+  }
 }
 
 // 切换项目状态 - 显示确认弹窗
@@ -695,7 +842,6 @@ const handleToggleStatusConfirm = () => {
 
 <style scoped>
 .tab-panel {
-  padding: 32px;
 }
 
 .table-shell {
@@ -766,7 +912,7 @@ th {
 
 .project-row {
   transition: all 0.2s ease;
-  cursor: pointer;
+  cursor: default;
   border-left: 3px solid transparent;
 }
 
@@ -889,6 +1035,22 @@ th {
 .subject-item .actions {
   display: flex;
   gap: 8px;
+}
+
+.subject-item {
+  cursor: move;
+  transition: all 0.2s ease;
+}
+
+.subject-item.is-dragging {
+  opacity: 0.5;
+  border: 2px dashed #ccc;
+  cursor: grabbing;
+}
+
+.subject-item.is-drag-over {
+  border-left: 3px solid var(--accent);
+  background-color: #e8f4ff;
 }
 
 .empty-state {
@@ -1067,6 +1229,20 @@ th {
 .acceptance-criteria strong {
   color: var(--accent);
   font-weight: 600;
+}
+
+/* 箭头按钮样式 */
+.btn.icon-btn {
+  min-width: 32px;
+  padding: 6px 8px;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.btn.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 @media (max-width: 768px) {

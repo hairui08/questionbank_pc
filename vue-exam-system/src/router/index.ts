@@ -22,10 +22,28 @@ const router = createRouter({
       meta: { title: '在线答题' }
     },
     {
+      path: '/student/practice/:id',
+      name: 'StudentPractice',
+      component: () => import('@/views/student/practice.vue'),
+      meta: { title: '练习答题' }
+    },
+    {
       path: '/student/result/:id',
       name: 'StudentResult',
-      component: () => import('@/views/student/result.vue'),
+      component: () => import('@/views/student/exam-records.vue'),
       meta: { title: '答题结果' }
+    },
+    {
+      path: '/student/practice-analysis/:id',
+      name: 'StudentPracticeAnalysis',
+      component: () => import('@/views/student/practice-analysis.vue'),
+      meta: { title: '练习模式·答案解析' }
+    },
+    {
+      path: '/student/exam-analysis/:id',
+      name: 'StudentExamAnalysis',
+      component: () => import('@/views/student/exam-analysis.vue'),
+      meta: { title: '考试模式·答案解析' }
     },
     {
       path: '/student/exam-records',
@@ -51,23 +69,12 @@ const router = createRouter({
       component: () => import('@/views/project-management/index.vue'),
       meta: { title: '项目管理' }
     },
-    {
-      path: '/chapter-management',
-      name: 'ChapterManagement',
-      component: () => import('@/views/chapter-management/index.vue'),
-      meta: { title: '章节管理' }
-    },
+    { path: '/category-management', name: 'CategoryManagement', component: () => import('@/views/category-management/index.vue'), meta: { title: '分类管理' } },
     {
       path: '/payment-rule-management',
       name: 'PaymentRuleManagement',
       component: () => import('@/views/payment-rule-management/index.vue'),
       meta: { title: '收费规则管理' }
-    },
-    {
-      path: '/learning-stage-management',
-      name: 'LearningStageManagement',
-      component: () => import('@/views/learning-stage-management/index.vue'),
-      meta: { title: '学习阶段管理' }
     },
     {
       path: '/question-type-management',
@@ -79,7 +86,7 @@ const router = createRouter({
       path: '/question-management',
       name: 'QuestionManagement',
       component: () => import('@/views/question-management/index.vue'),
-      meta: { title: '题库管理' }
+      meta: { title: '试题管理' }
     },
     {
       path: '/question-management/add',
@@ -93,6 +100,13 @@ const router = createRouter({
       component: () => import('@/views/question-management/add.vue'),
       meta: { title: '编辑试题' }
     },
+    // 试题分类管理路由（待实现）
+    // {
+    //   path: '/question-management/category',
+    //   name: 'QuestionCategory',
+    //   component: () => import('@/views/question-management/category-management.vue'),
+    //   meta: { title: '试题分类管理' }
+    // },
     {
       path: '/knowledge-point-management',
       name: 'KnowledgePointManagement',

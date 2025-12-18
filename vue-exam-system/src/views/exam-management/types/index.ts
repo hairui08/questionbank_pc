@@ -1,5 +1,5 @@
 // 试卷管理类型定义
-import type { QuestionOption, SubQuestion } from '@/views/question-management/types'
+import type { QuestionOption, SubQuestion, QuestionFrequency } from '@/views/question-management/types'
 import type { PaymentRuleParams } from '@/views/payment-rule-management/types'
 
 /** 试卷状态 */
@@ -14,9 +14,13 @@ export interface EmbeddedQuestionData {
   mainStem?: string // 案例背景（组合题）
   subQuestions?: SubQuestion[] // 小问列表（组合题）
   chapterId?: string // 所属章节
-  knowledgePointIds?: string[] // 关联知识点
+  knowledgePointIds: string[] // 关联知识点（必填：至少选择一个）
   difficulty?: string // 难度
+  frequency: QuestionFrequency // 试题频次（必填：low | medium | high）
+  year?: number // 所属年份（可选）
   source?: string // 来源
+  paymentRuleId?: string // 收费规则（可选）
+  paymentRuleParams?: PaymentRuleParams // 收费规则参数（可选）
 }
 
 /** 试卷中的题目 */
@@ -66,4 +70,28 @@ export interface Exam extends ExamForm {
   creatorId: string
   creatorName: string
   status: ExamStatus
+}
+
+/** 学习阶段树节点（第三级） */
+export interface LearningStageTreeNode {
+  id: string
+  name: string
+  type: 'learningStage'
+  isChapterPractice: boolean  // 用于过滤章节练习
+}
+
+/** 科目树节点（第二级，包含学习阶段） */
+export interface SubjectWithStagesTreeNode {
+  id: string
+  name: string
+  type: 'subject'
+  learningStages: LearningStageTreeNode[]
+}
+
+/** 项目树节点（第一级） */
+export interface ProjectWithStagesTreeNode {
+  id: string
+  name: string
+  type: 'project'
+  subjects: SubjectWithStagesTreeNode[]
 }

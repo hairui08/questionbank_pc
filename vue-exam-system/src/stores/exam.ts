@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { Exam, ExamForm, ExamFilter } from '@/views/exam-management/types'
+import { ref, computed } from 'vue'
+import type { Exam, ExamForm, ExamFilter, ProjectWithStagesTreeNode } from '@/views/exam-management/types'
+import { useQuestionStore } from './question'
+import { useLearningStageStore } from './learningStage'
+import { useProjectStore } from './project'
 
 export const useExamStore = defineStore('exam', () => {
   // Mock试卷数据
@@ -231,6 +234,88 @@ export const useExamStore = defineStore('exam', () => {
     )
   }
 
+  /**
+   * 同步试卷中的试题到题库
+   * @param examId 试卷ID
+   * @returns 同步结果
+   */
+  function syncExamQuestionsToLibrary(examId: string): { success: boolean; message: string; count: number } {
+    const exam = mockExams.value.find(e => e.id === examId)
+    if (!exam) {
+      return { success: false, message: '试卷不存在', count: 0 }
+    }
+
+    // 筛选出嵌入式试题（embedded字段存在的试题）
+    const embeddedQuestions = exam.questions
+      .filter(q => q.embedded)
+      .map(q => q.embedded!)
+
+    if (embeddedQuestions.length === 0) {
+      return { success: true, message: '无需同步：试卷中没有新增试题', count: 0 }
+    }
+
+    // 调用 questionStore 批量导入
+    const questionStore = useQuestionStore()
+    const importedCount = questionStore.importQuestionsFromExam(
+      examId,
+      embeddedQuestions,
+      exam.subjectId // 使用试卷的科目ID作为默认章节ID（实际使用时可能需要调整）
+    )
+
+    return {
+      success: true,
+      message: `成功同步 ${importedCount} 道试题到题库`,
+      count: importedCount
+    }
+  }
+
+  // 获取其他 store 实例
+  const learningStageStore = useLearningStageStore()
+  const projectStore = useProjectStore()
+
+  // 构建包含学习阶段的项目树（三级结构：项目→科目→学习阶段）
+  const projectTreeWithStages = computed<ProjectWithStagesTreeNode[]>(() => {
+    return projectStore.projects
+      .filter(p => p.status === 'active')  // 只显示启用的项目
+      .map(project => {
+        // 获取该项目下的所有科目
+        const projectSubjects = projectStore.subjects.filter(
+          s => s.projectId === project.id && s.status === 'active'
+        )
+
+        const subjects = projectSubjects.map(subject => {
+          // 获取该科目下的所有学习阶段（排除章节练习）
+          const stages = learningStageStore.learningStages
+            .filter(stage =>
+              stage.subjectId === subject.id &&
+              stage.status === 'active' &&
+              stage.isChapterPractice !== true  // 过滤章节练习
+            )
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+            .map(stage => ({
+              id: stage.id,
+              name: stage.name,
+              type: 'learningStage' as const,
+              isChapterPractice: stage.isChapterPractice
+            }))
+
+          return {
+            id: subject.id,
+            name: subject.name,
+            type: 'subject' as const,
+            learningStages: stages
+          }
+        })
+
+        return {
+          id: project.id,
+          name: project.name,
+          type: 'project' as const,
+          subjects
+        }
+      })
+  })
+
   return {
     mockExams,
     currentFilter,
@@ -242,6 +327,8 @@ export const useExamStore = defineStore('exam', () => {
     deleteExam,
     deleteExamsBatch,
     toggleExamStatus,
-    checkExamNameUnique
+    checkExamNameUnique,
+    syncExamQuestionsToLibrary,
+    projectTreeWithStages
   }
 })

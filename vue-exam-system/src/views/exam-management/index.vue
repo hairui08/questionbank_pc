@@ -6,20 +6,14 @@
         <div class="tab-panel">
           <div class="prototype-wrapper">
             <div class="exam-management-container">
-              <!-- 左侧: 项目-科目树 -->
-              <div class="left-sidebar">
-                <SubjectTree
-                  :active-subject-id="activeSubject?.id"
-                  @subject-change="handleSubjectChange"
-                />
-              </div>
+              <!-- 树形导航面板 -->
+              <SubjectTree @filter-change="handleFilterChange" />
 
               <!-- 右侧: 筛选器 + 操作按钮 + 表格 -->
               <div class="right-content">
                 <!-- 筛选器 -->
                 <ExamFilter
                   v-model="filter"
-                  :active-subject-id="activeSubject?.id"
                   @search="handleSearch"
                   @reset="handleReset"
                 />
@@ -29,6 +23,13 @@
                   <div class="action-left">
                     <button class="btn primary" @click="handleCreate">
                       ➕ 创建试卷
+                    </button>
+                    <button
+                      class="btn warning"
+                      :disabled="selectedIds.length === 0"
+                      @click="handleBatchDisable"
+                    >
+                      🚫 批量禁用
                     </button>
                     <button
                       class="btn danger"
@@ -268,6 +269,30 @@
                     <td>验证试卷名称必填;验证至少包含1道试题;验证及格分≤总分;验证试卷名称在同科目下唯一</td>
                     <td>P0</td>
                   </tr>
+                  <tr>
+                    <td>题目状态标签显示</td>
+                    <td>在题目列表中显示试题状态标签</td>
+                    <td>已删除试题显示红色"已删除"标签;已过时试题显示黄色"已过时"标签;状态标签显示在题干右侧</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>关联知识点显示</td>
+                    <td>在题目列表中显示关联的知识点</td>
+                    <td>显示所有关联知识点名称,用卡片形式展示;每个知识点卡片也显示其状态标签(已删除/已过时);鼠标悬停显示知识点详情</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>添加试题知识点必填</td>
+                    <td>在添加试题时,知识点和频次字段为必填</td>
+                    <td>知识点下拉框支持多选,至少选择1个;频次为low/medium/high三档选择,默认medium;保存前校验必填性</td>
+                    <td>P0</td>
+                  </tr>
+                  <tr>
+                    <td>试卷保存后同步到题库</td>
+                    <td>保存试卷后自动将嵌入式试题同步到题库</td>
+                    <td>保存试卷时,检查题库中是否存在相同题干的试题(按科目+章节);若不存在则自动添加;若存在则跳过;同步成功后Toast提示"试卷保存成功,已同步X道试题到题库"</td>
+                    <td>P0</td>
+                  </tr>
                 </tbody>
               </table>
 
@@ -401,6 +426,24 @@
                     <td>无</td>
                     <td>true</td>
                     <td>预览时始终显示答案和解析</td>
+                  </tr>
+                  <tr>
+                    <td>知识点关联</td>
+                    <td>Array</td>
+                    <td>1-N个知识点ID</td>
+                    <td>✓</td>
+                    <td>无</td>
+                    <td>[]</td>
+                    <td>添加试题时必须至少选择1个知识点</td>
+                  </tr>
+                  <tr>
+                    <td>频次评分</td>
+                    <td>Enum</td>
+                    <td>low/medium/high</td>
+                    <td>✓</td>
+                    <td>无</td>
+                    <td>medium</td>
+                    <td>试题频次:low(低频)、medium(中频)、high(高频)</td>
                   </tr>
                 </tbody>
               </table>
@@ -788,6 +831,42 @@
                       <td>在预览抽屉中查看组合题</td>
                       <td>显示大题干(案例背景),然后依次显示每个小问的题号、题干、选项、答案和解析</td>
                     </tr>
+                    <tr>
+                      <td>AC-26</td>
+                      <td>用户在试卷编辑页查看题目列表,某道试题已被软删除</td>
+                      <td>查看题目状态</td>
+                      <td>该试题题干右侧显示红色"已删除"标签,提示用户该题已从题库删除</td>
+                    </tr>
+                    <tr>
+                      <td>AC-27</td>
+                      <td>用户在试卷编辑页查看题目列表,某道试题已被标记过时</td>
+                      <td>查看题目状态</td>
+                      <td>该试题题干右侧显示黄色"已过时"标签,提示用户该题建议更新</td>
+                    </tr>
+                    <tr>
+                      <td>AC-28</td>
+                      <td>用户在试卷编辑页查看题目列表,某道试题关联了3个知识点</td>
+                      <td>查看知识点信息</td>
+                      <td>题目卡片下方显示知识点列表区域,展示3个知识点卡片"财务报表分析"、"现金流量管理"、"成本核算",每个知识点卡片也显示其状态(如已删除/已过时)</td>
+                    </tr>
+                    <tr>
+                      <td>AC-29</td>
+                      <td>用户在试卷编辑页添加试题,选择了2个知识点,设置频次为high</td>
+                      <td>保存试题到试卷</td>
+                      <td>试题保存成功,显示知识点和频次信息</td>
+                    </tr>
+                    <tr>
+                      <td>AC-30</td>
+                      <td>用户在试卷编辑页添加试题,未选择知识点</td>
+                      <td>点击保存试题</td>
+                      <td>系统拦截保存,Toast提示"请为试题选择至少1个知识点",焦点定位到知识点选择器</td>
+                    </tr>
+                    <tr>
+                      <td>AC-31</td>
+                      <td>用户在试卷编辑页完成编辑,包含10道试题(其中5道为题库已有,5道为新创建的嵌入式试题)</td>
+                      <td>点击保存试卷</td>
+                      <td>试卷保存成功,5道嵌入式试题自动同步到题库,Toast提示"试卷保存成功,已同步5道试题到题库"</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -823,7 +902,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppLayout from '@/components/Layout/AppLayout.vue'
 import TabNavigation from '@/components/Tab/TabNavigation.vue'
-import SubjectTree from '@/views/chapter-management/components/SubjectTree.vue'
+import SubjectTree from './components/SubjectTree.vue'
 import ExamFilter from './components/ExamFilter.vue'
 import ExamTable from './components/ExamTable.vue'
 import DeleteConfirmModal from './components/DeleteConfirmModal.vue'
@@ -970,6 +1049,25 @@ function handleEdit(id: string) {
   router.push(`/exam-management/edit/${id}`)
 }
 
+// 批量禁用
+function handleBatchDisable() {
+  if (selectedIds.value.length === 0) {
+    showToast('请先选择要禁用的试卷', { type: 'error' })
+    return
+  }
+
+  if (!confirm(`确定要禁用选中的 ${selectedIds.value.length} 份试卷吗？`)) {
+    return
+  }
+
+  selectedIds.value.forEach(id => {
+    examStore.toggleExamStatus(id)
+  })
+
+  showToast(`成功禁用 ${selectedIds.value.length} 份试卷`, { type: 'success' })
+  selectedIds.value = []
+}
+
 // 批量删除
 function handleBatchDelete() {
   if (selectedIds.value.length === 0) {
@@ -1028,11 +1126,26 @@ onMounted(() => {
     }
   }
 })
+
+// 处理树形面板筛选变化
+function handleFilterChange(filterState: any) {
+  if (filterState.type === 'subject') {
+    filter.value.subjectId = filterState.subjectId
+    filter.value.chapterId = ''
+  } else if (filterState.type === 'chapter') {
+    filter.value.subjectId = filterState.subjectId
+    filter.value.chapterId = filterState.id
+  } else if (filterState.type === 'section') {
+    filter.value.subjectId = filterState.subjectId
+    filter.value.chapterId = ''
+  }
+  currentPage.value = 1
+  selectedIds.value = []
+}
 </script>
 
 <style scoped>
 .tab-panel {
-  padding: 32px;
   animation: fade-in 0.3s ease;
 }
 
@@ -1128,6 +1241,21 @@ onMounted(() => {
 }
 
 .btn.danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn.warning {
+  background: linear-gradient(180deg, #ffa726 0%, #fb8c00 100%);
+  color: #ffffff;
+  border-color: #f57c00;
+}
+
+.btn.warning:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ff9800 0%, #f57c00 100%);
+}
+
+.btn.warning:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

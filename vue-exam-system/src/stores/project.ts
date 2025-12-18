@@ -10,7 +10,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '高级会计师',
       status: 'active',
       order: 1,
-      year: 2025,
       createdAt: '2025-09-15 09:30'
     },
     {
@@ -18,7 +17,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '高级经济师',
       status: 'active',
       order: 2,
-      year: 2025,
       createdAt: '2025-08-22 14:10'
     },
     {
@@ -26,7 +24,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '中级经济师',
       status: 'disabled',
       order: 3,
-      year: 2024,
       createdAt: '2025-07-02 11:05'
     },
     {
@@ -34,7 +31,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '中级会计师',
       status: 'active',
       order: 4,
-      year: 2025,
       createdAt: '2025-05-18 10:20'
     }
   ])
@@ -47,7 +43,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '财务战略管理',
       status: 'active',
       order: 1,
-      year: 2025,
       createdAt: '2025-09-15 09:30'
     },
     {
@@ -57,7 +52,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '税务风险控制',
       status: 'active',
       order: 2,
-      year: 2025,
       createdAt: '2025-09-15 09:30'
     },
     {
@@ -67,7 +61,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '内部控制优化',
       status: 'disabled',
       order: 3,
-      year: 2024,
       createdAt: '2025-09-15 09:30'
     },
     {
@@ -77,7 +70,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '宏观经济分析',
       status: 'active',
       order: 1,
-      year: 2025,
       createdAt: '2025-08-22 14:10'
     },
     {
@@ -87,7 +79,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '产业经济研究',
       status: 'active',
       order: 2,
-      year: 2024,
       createdAt: '2025-08-22 14:10'
     },
     {
@@ -97,7 +88,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '市场经济基础',
       status: 'disabled',
       order: 1,
-      year: 2024,
       createdAt: '2025-07-02 11:05'
     },
     {
@@ -107,7 +97,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '项目可行性评估',
       status: 'disabled',
       order: 2,
-      year: 2023,
       createdAt: '2025-07-02 11:05'
     },
     {
@@ -117,7 +106,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '成本管理实务',
       status: 'active',
       order: 1,
-      year: 2025,
       createdAt: '2025-05-18 10:20'
     },
     {
@@ -127,7 +115,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '财务报表编制',
       status: 'active',
       order: 2,
-      year: 2024,
       createdAt: '2025-05-18 10:20'
     },
     {
@@ -137,7 +124,6 @@ export const useProjectStore = defineStore('project', () => {
       name: '审计与合规',
       status: 'active',
       order: 3,
-      year: 2024,
       createdAt: '2025-05-18 10:20'
     }
   ])
@@ -149,9 +135,15 @@ export const useProjectStore = defineStore('project', () => {
 
   // 添加项目
   const addProject = (project: Omit<Project, 'id' | 'createdAt'>) => {
+    // 自动计算order：取所有项目中最大的order值+1
+    const maxOrder = projects.value.length > 0
+      ? Math.max(...projects.value.map(p => p.order))
+      : 0
+
     const newProject: Project = {
       ...project,
       id: `p${Date.now()}`,
+      order: maxOrder + 1, // 自动设置为最大值+1
       createdAt: new Date().toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
@@ -188,9 +180,16 @@ export const useProjectStore = defineStore('project', () => {
 
   // 添加科目
   const addSubject = (subject: Omit<Subject, 'id' | 'createdAt'>) => {
+    // 自动计算order：取同项目下所有科目中最大的order值+1
+    const projectSubjects = subjects.value.filter(s => s.projectId === subject.projectId)
+    const maxOrder = projectSubjects.length > 0
+      ? Math.max(...projectSubjects.map(s => s.order))
+      : 0
+
     const newSubject: Subject = {
       ...subject,
       id: `s${Date.now()}`,
+      order: maxOrder + 1, // 自动设置为最大值+1
       createdAt: new Date().toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
@@ -270,6 +269,42 @@ export const useProjectStore = defineStore('project', () => {
     return { success: true }
   }
 
+  // 重新排序项目（拖拽后调用）
+  const reorderProjects = (draggedId: string, targetId: string) => {
+    const draggedProject = projects.value.find(p => p.id === draggedId)
+    const targetProject = projects.value.find(p => p.id === targetId)
+
+    if (!draggedProject || !targetProject) return
+
+    const draggedOrder = draggedProject.order
+    const targetOrder = targetProject.order
+
+    // 交换order值
+    draggedProject.order = targetOrder
+    targetProject.order = draggedOrder
+
+    // 按order重新排序数组
+    projects.value.sort((a, b) => a.order - b.order)
+  }
+
+  // 重新排序科目（拖拽后调用）
+  const reorderSubjects = (draggedId: string, targetId: string) => {
+    const draggedSubject = subjects.value.find(s => s.id === draggedId)
+    const targetSubject = subjects.value.find(s => s.id === targetId)
+
+    if (!draggedSubject || !targetSubject) return
+
+    const draggedOrder = draggedSubject.order
+    const targetOrder = targetSubject.order
+
+    // 交换order值
+    draggedSubject.order = targetOrder
+    targetSubject.order = draggedOrder
+
+    // 按order重新排序数组
+    subjects.value.sort((a, b) => a.order - b.order)
+  }
+
   return {
     projects,
     subjects,
@@ -284,6 +319,8 @@ export const useProjectStore = defineStore('project', () => {
     updateSubject,
     deleteSubject,
     toggleProjectStatus,
-    toggleSubjectStatus
+    toggleSubjectStatus,
+    reorderProjects,
+    reorderSubjects
   }
 })

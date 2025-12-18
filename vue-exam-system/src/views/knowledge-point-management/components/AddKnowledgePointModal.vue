@@ -5,24 +5,26 @@
     @update:visible="isVisible = $event"
     @close="handleClose"
   >
-    <form @submit.prevent="handleSubmit">
-      <div class="form-group">
-        <label for="project">所属项目 <span class="required">*</span></label>
+    <form class="form" @submit.prevent="handleSubmit">
+      <!-- 所属章（点击章或节时都显示在前面） -->
+      <div v-if="activeNode && (activeNode.type === 'chapter' || activeNode.type === 'section')" class="form-group">
+        <label for="chapter">所属章 <span class="required">*</span></label>
         <input
-          id="project"
+          id="chapter"
           type="text"
-          :value="activeSubject?.projectName || ''"
+          :value="activeNode.type === 'chapter' ? activeNode.name : activeNode.chapterName"
           class="readonly-input"
           readonly
         />
       </div>
 
-      <div class="form-group">
-        <label for="subject">所属科目 <span class="required">*</span></label>
+      <!-- 所属节（只在点击节时显示） -->
+      <div v-if="activeNode && activeNode.type === 'section'" class="form-group">
+        <label for="section">所属节 <span class="required">*</span></label>
         <input
-          id="subject"
+          id="section"
           type="text"
-          :value="activeSubject?.name || ''"
+          :value="activeNode.name"
           class="readonly-input"
           readonly
         />
@@ -43,45 +45,15 @@
       </div>
 
       <div class="form-group">
-        <label for="chapters">关联章节（可选）</label>
-        <div class="chapter-tree">
-          <div v-if="chaptersTree.length === 0" class="empty-text">
-            该科目下暂无章节
-          </div>
-          <div v-for="chapter in chaptersTree" :key="chapter.id" class="chapter-node">
-            <!-- 章节行 -->
-            <div class="chapter-row">
-              <span
-                v-if="chapter.sections.length > 0"
-                class="expand-icon"
-                @click="toggleChapter(chapter.id)"
-              >
-                {{ expandedChapters.has(chapter.id) ? '▼' : '▶' }}
-              </span>
-              <span v-else class="expand-icon-placeholder"></span>
-              <input
-                :id="`chapter-${chapter.id}`"
-                v-model="formData.chapterIds"
-                type="checkbox"
-                :value="chapter.id"
-              />
-              <label :for="`chapter-${chapter.id}`">{{ chapter.name }}</label>
-            </div>
+        <label for="difficulty-level">难易程度</label>
+        <StarRating v-model="formData.difficultyLevel" />
+        <span class="hint">请选择1-5星表示难易程度（可选）</span>
+      </div>
 
-            <!-- 小节列表（可展开） -->
-            <div v-if="expandedChapters.has(chapter.id)" class="section-list">
-              <div v-for="section in chapter.sections" :key="section.id" class="section-item">
-                <input
-                  :id="`section-${section.id}`"
-                  v-model="formData.chapterIds"
-                  type="checkbox"
-                  :value="section.id"
-                />
-                <label :for="`section-${section.id}`">{{ section.name }}</label>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="form-group">
+        <label for="frequency-level">出现频率 <span class="required">*</span></label>
+        <StarRating v-model="formData.frequencyLevel" />
+        <span class="hint">请选择1-5星表示出现频率</span>
       </div>
     </form>
 
@@ -96,6 +68,7 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { useChapterStore } from '@/stores/chapter'
 import BaseModal from '@/components/Modal/BaseModal.vue'
+import StarRating from '@/components/StarRating.vue'
 import type { KnowledgePointFormData } from '../types'
 
 // Props
@@ -106,6 +79,15 @@ interface Props {
     name: string
     projectId: string
     projectName: string
+  } | null
+  // 左侧点击的节点信息
+  activeNode: {
+    type: 'subject' | 'chapter' | 'section'
+    id: string
+    name: string
+    chapterId?: string
+    chapterName?: string
+    subjectId: string
   } | null
 }
 
@@ -126,7 +108,9 @@ const isVisible = ref(props.visible)
 const formData = reactive<KnowledgePointFormData>({
   subjectId: '',
   name: '',
-  chapterIds: []
+  chapterIds: [],
+  difficultyLevel: 3,
+  frequencyLevel: 3
 })
 
 // 表单错误
@@ -159,6 +143,9 @@ const toggleChapter = (chapterId: string) => {
 // 计算属性：当前选中的科目
 const activeSubject = computed(() => props.activeSubject)
 
+// 计算属性：当前点击的节点
+const activeNode = computed(() => props.activeNode)
+
 // 监听visible变化
 watch(
   () => props.visible,
@@ -172,6 +159,19 @@ watch(
       errors.name = ''
       // 重置章节展开状态
       expandedChapters.value.clear()
+      
+      // 根据activeNode设置表单数据
+      if (activeNode.value) {
+        // 设置subjectId
+        formData.subjectId = activeNode.value.subjectId
+        
+        // 根据节点类型设置章节ID
+        if (activeNode.value.type === 'chapter') {
+          formData.chapterIds = [activeNode.value.id]
+        } else if (activeNode.value.type === 'section' && activeNode.value.chapterId) {
+          formData.chapterIds = [activeNode.value.chapterId]
+        }
+      }
     }
   }
 )
@@ -207,11 +207,25 @@ const handleSubmit = () => {
     return
   }
 
+  // 根据activeNode类型设置章节ID
+  let chapterIds = formData.chapterIds
+  if (activeNode.value) {
+    if (activeNode.value.type === 'chapter') {
+      // 点击的是章，直接使用该章ID
+      chapterIds = [activeNode.value.id]
+    } else if (activeNode.value.type === 'section' && activeNode.value.chapterId) {
+      // 点击的是节，使用所属章ID
+      chapterIds = [activeNode.value.chapterId]
+    }
+  }
+
   // 提交知识点数据
   const submitData: KnowledgePointFormData = {
     subjectId: formData.subjectId,
     name: formData.name,
-    chapterIds: formData.chapterIds
+    chapterIds: chapterIds,
+    difficultyLevel: formData.difficultyLevel,
+    frequencyLevel: formData.frequencyLevel
   }
 
   emit('submit', submitData)
@@ -273,6 +287,14 @@ const handleClose = () => {
   margin-top: 6px;
   font-size: 12px;
   color: #e74c3c;
+}
+
+.hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--secondary-text);
+  font-style: italic;
 }
 
 .chapter-tree {

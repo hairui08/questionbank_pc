@@ -8,62 +8,142 @@
             <!-- 基本信息筛选 -->
             <div class="form-section">
               <h4>基本信息筛选</h4>
+              <!-- 第一行: 项目、科目、章节、知识点 -->
               <div class="filter-grid">
                 <div class="form-group">
-                  <label>项目 <span class="required">*</span></label>
-                  <select v-model="filter.projectId" @change="onProjectChange" required :disabled="isEditMode">
-                    <option value="">请选择项目</option>
-                    <option v-for="project in projects" :key="project.id" :value="project.id">
-                      {{ project.name }}
-                    </option>
-                  </select>
-                  <span v-if="isEditMode" class="form-hint">编辑模式下不可修改项目</span>
+                  <label>项目-科目-阶段 <span class="required">*</span></label>
+                  <div class="tree-select-wrapper">
+                    <div class="tree-select-input" @click="toggleProjectTreeVisible">
+                      <span>{{ selectedProjectName || '请选择项目' }}</span>
+                      <span class="arrow">{{ projectTreeVisible ? '▼' : '▶' }}</span>
+                    </div>
+                    <div v-if="projectTreeVisible" class="tree-select-dropdown">
+                      <div class="search-box">
+                        <input type="text" placeholder="搜索项目/科目/章节..." class="search-input" v-model="projectSearchText" />
+                      </div>
+                      <div class="tree-content">
+                        <!-- 项目列表 -->
+                        <div
+                          v-for="project in chapterStore.projectTree"
+                          :key="project.id"
+                          class="tree-item"
+                          :class="{
+                            'is-expanded': expandedProjects.has(project.id),
+                            'project': true
+                          }"
+                        >
+                          <div class="tree-item-header" @click="toggleProject(project.id)">
+                            <span class="arrow">{{ expandedProjects.has(project.id) ? '▼' : '▶' }}</span>
+                            <span class="node-icon">📁</span>
+                            <span class="name">{{ project.name }}</span>
+                          </div>
+                          <!-- 科目列表 -->
+                          <div class="tree-children">
+                            <div
+                              v-for="subject in project.subjects"
+                              :key="subject.id"
+                              class="tree-item"
+                              :class="{
+                                'is-expanded': expandedSubjects.has(subject.id),
+                                'subject': true
+                              }"
+                            >
+                              <div class="tree-item-header" @click="toggleSubject(subject.id)">
+                                <span class="arrow">{{ expandedSubjects.has(subject.id) ? '▼' : '▶' }}</span>
+                                <span class="node-icon">📚</span>
+                                <span class="name">{{ subject.name }}</span>
+                              </div>
+                              <!-- 章节列表 -->
+                              <div class="tree-children">
+                                <div
+                                  v-for="chapter in chapterStore.chapters.filter(c => c.subjectId === subject.id)"
+                                  :key="chapter.id"
+                                  class="tree-item"
+                                  :class="{
+                                    'chapter': true,
+                                    'is-active': selectedChapterId === chapter.id
+                                  }"
+                                >
+                                  <div class="tree-item-header" @click="selectChapter(chapter)">
+                                    <span class="node-icon">📖</span>
+                                    <span class="name">{{ chapter.name }}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <input type="hidden" v-model="filter.projectId" required />
+                  <input type="hidden" v-model="filter.subjectId" required />
+                  <input type="hidden" v-model="filter.chapterId" required />
                 </div>
-                <div class="form-group">
-                  <label>科目 <span class="required">*</span></label>
-                  <select v-model="filter.subjectId" @change="onSubjectChange" :disabled="!filter.projectId || isEditMode" required>
-                    <option value="">{{ filter.projectId ? '请选择科目' : '请先选择项目' }}</option>
-                    <option v-for="subject in filteredSubjects" :key="subject.id" :value="subject.id">
-                      {{ subject.name }}
-                    </option>
-                  </select>
-                  <span v-if="isEditMode" class="form-hint">编辑模式下不可修改科目</span>
-                </div>
-                <div class="form-group">
+                <div v-if="isChapterPractice" class="form-group">
                   <label>章节 <span class="required">*</span></label>
-                  <select v-model="filter.chapterId" :disabled="!filter.subjectId" required>
-                    <option value="">{{ filter.subjectId ? '请选择章节' : '请先选择科目' }}</option>
-                    <option v-for="chapter in filteredChapters" :key="chapter.id" :value="chapter.id">
-                      {{ chapter.name }}
+                  <div class="tree-select-wrapper">
+                    <div class="tree-select-input" @click="toggleChapterTreeVisible">
+                      <span>{{ selectedChapterName || (filter.subjectId ? '请选择章节' : '请先选择科目') }}</span>
+                      <span class="arrow">{{ chapterTreeVisible ? '▼' : '▶' }}</span>
+                    </div>
+                    <div v-if="chapterTreeVisible" class="tree-select-dropdown">
+                      <div class="search-box">
+                        <input type="text" placeholder="搜索章节..." class="search-input" v-model="chapterSearchText" />
+                      </div>
+                      <div class="tree-content">
+                        <!-- 小节列表 -->
+                        <div
+                          v-for="section in filteredSections"
+                          :key="section.id"
+                          class="tree-item"
+                          :class="{
+                            'is-expanded': expandedSections.has(section.id),
+                            'section': true,
+                            'is-active': selectedChapterId === section.id
+                          }"
+                        >
+                          <div class="tree-item-header" @click="toggleSection(section.id)">
+                            <span class="arrow">{{ expandedSections.has(section.id) ? '▼' : '▶' }}</span>
+                            <span class="node-icon">📑</span>
+                            <span class="name">{{ section.name }}</span>
+                          </div>
+                          <!-- 子小节列表 -->
+                          <div class="tree-children">
+                            <div
+                              v-for="subSection in getSubSectionsBySection(section.id)"
+                              :key="subSection.id"
+                              class="tree-item"
+                              :class="{
+                                'subsection': true,
+                                'is-active': selectedChapterId === subSection.id
+                              }"
+                            >
+                              <div class="tree-item-header" @click="selectChapterItem(subSection)">
+                                <span class="node-icon">📄</span>
+                                <span class="name">{{ subSection.name }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <input type="hidden" v-model="filter.chapterId" required />
+                </div>
+                <div v-else class="form-group">
+                  <label>试卷 <span class="required">*</span></label>
+                  <select v-model="filter.paperId" required>
+                    <option value="" disabled>{{ filter.subjectId ? '请选择试卷' : '请先选择科目' }}</option>
+                    <option
+                      v-for="paper in filteredPapers"
+                      :key="paper.id"
+                      :value="paper.id"
+                    >
+                      {{ paper.name }}
                     </option>
                   </select>
-                </div>
-                <div class="form-group">
-                  <label>试题来源</label>
-                  <select v-model="filter.source">
-                    <option value="">全部来源</option>
-                    <option value="official">历年真题</option>
-                    <option value="simulation">模拟试题</option>
-                    <option value="custom">自定义</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>所属年份</label>
-                  <select v-model="filter.year">
-                    <option value="">全部年份</option>
-                    <option value="2025">2025</option>
-                    <option value="2024">2024</option>
-                    <option value="2023">2023</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>试题难度</label>
-                  <select v-model="filter.difficulty">
-                    <option value="">全部难度</option>
-                    <option value="easy">简单</option>
-                    <option value="medium">中等</option>
-                    <option value="hard">困难</option>
-                  </select>
+                  <input type="hidden" v-model="filter.paperId" required />
                 </div>
                 <div class="form-group">
                   <label>收费规则</label>
@@ -72,7 +152,7 @@
                     :applicable-to="['question']"
                   />
                 </div>
-                <div class="form-group knowledge-points-select">
+                <div class="form-group">
                   <label>关联知识点</label>
                   <div class="knowledge-point-input-wrapper">
                     <div class="knowledge-point-display" :class="{ 'is-disabled': !filter.subjectId }">
@@ -99,7 +179,47 @@
                       添加知识点
                     </button>
                   </div>
-                  <span class="form-hint">提示：一个试题可以关联多个知识点</span>
+                </div>
+              </div>
+
+              <!-- 第二行: 所属年份、试题难度、分类、收费规则（试题来源已隐藏，默认为试题管理） -->
+              <div class="filter-grid-row2">
+                <!-- 试题来源字段已隐藏，默认值为 'question-management' -->
+                <div class="form-group" v-if="false">
+                  <label>试题来源</label>
+                  <select v-model="filter.source">
+                    <option value="">全部来源</option>
+                    <option value="official">历年真题</option>
+                    <option value="simulation">模拟试题</option>
+                    <option value="custom">自定义</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>所属年份</label>
+                  <select v-model="filter.year">
+                    <option value="">请选择年份</option>
+                    <option v-for="year in yearOptions" :key="year" :value="String(year)">
+                      {{ year }}
+                    </option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>试题难度</label>
+                  <select v-model="filter.difficulty">
+                    <option value="">全部难度</option>
+                    <option value="easy">简单</option>
+                    <option value="medium">中等</option>
+                    <option value="hard">困难</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>试题频次 <span class="required">*</span></label>
+                  <select v-model="filter.frequency" required>
+                    <option value="">请选择频次</option>
+                    <option value="low">低频</option>
+                    <option value="medium">中频</option>
+                    <option value="high">高频</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -107,8 +227,16 @@
             <!-- 题型选择 -->
             <div class="form-section">
               <h4>题型选择</h4>
-              <div class="type-selector">
-                <label v-for="type in questionTypes" :key="type.value" class="type-label" :class="{ active: currentType === type.value, disabled: isEditMode }">
+              <!-- 空状态提示 -->
+              <div v-if="!filter.subjectId" class="empty-hint">
+                请先选择科目
+              </div>
+              <div v-else-if="availableQuestionTypes.length === 0" class="empty-hint">
+                当前科目暂无可用题型，请先在题型管理中配置
+              </div>
+              <!-- 题型选择器 -->
+              <div v-else class="type-selector">
+                <label v-for="type in availableQuestionTypes" :key="type.value" class="type-label" :class="{ active: currentType === type.value, disabled: isEditMode }">
                   <input
                     type="radio"
                     name="question-type"
@@ -149,12 +277,18 @@
                 <p>暂无小问，请点击【添加小问】按钮开始创建</p>
               </div>
 
-              <div v-for="(subQ, index) in subQuestions" :key="subQ.id" class="sub-question-card">
+              <div v-for="(subQ, index) in subQuestions" :key="subQ.id" class="sub-question-card" :class="{ 'is-disabled': subQ.disabled }">
                 <div class="sub-question-header">
                   <span class="sub-question-number">小问 {{ index + 1 }}</span>
-                  <button type="button" class="remove-sub-question-btn" @click="removeSubQuestion(index)">
-                    删除小问
-                  </button>
+                  <span v-if="subQ.disabled" class="disabled-badge">已禁用</span>
+                  <div class="sub-question-actions">
+                    <button type="button" class="toggle-sub-question-btn" :class="{ active: !subQ.disabled }" @click="toggleSubQuestionDisabled(index)">
+                      {{ subQ.disabled ? '启用' : '禁用' }}
+                    </button>
+                    <button type="button" class="remove-sub-question-btn" @click="removeSubQuestion(index)">
+                      删除小问
+                    </button>
+                  </div>
                 </div>
 
                 <div class="sub-question-body">
@@ -185,7 +319,26 @@
                   <div v-if="isSubQuestionObjective(subQ.type)" class="form-group">
                     <label>选项设置 <span class="required">*</span></label>
                     <div class="options-container">
-                      <div v-for="(opt, optIndex) in subQ.options" :key="opt.label" class="option-item">
+                      <div v-for="(opt, optIndex) in subQ.options" :key="opt.label" class="sub-option-item">
+                        <!-- 单选题：添加 radio -->
+                        <input
+                          v-if="subQ.type === 'single'"
+                          type="radio"
+                          :id="`sub-answer-${index}-${opt.label}`"
+                          :value="opt.label"
+                          v-model="subQ.answer"
+                          class="answer-radio"
+                        >
+                        <!-- 多选题：添加 checkbox -->
+                        <input
+                          v-else-if="subQ.type === 'multiple'"
+                          type="checkbox"
+                          :id="`sub-answer-${index}-${opt.label}`"
+                          :value="opt.label"
+                          v-model="subQ.answer"
+                          class="answer-checkbox"
+                        >
+
                         <div class="option-label">{{ opt.label }}</div>
                         <input
                           type="text"
@@ -212,30 +365,15 @@
                     >
                       ➕ 添加选项
                     </button>
+                    <span class="form-hint">提示：点击选项前的单选框/多选框来选择正确答案，最少2个选项，最多10个选项</span>
                   </div>
 
-                  <!-- 答案 -->
-                  <div class="form-group">
+                  <!-- 答案（仅判断题和简答题） -->
+                  <div v-if="subQ.type === 'judgment' || subQ.type === 'essay'" class="form-group">
                     <label>正确答案 <span class="required">*</span></label>
 
-                    <!-- 单选题答案 -->
-                    <div v-if="subQ.type === 'single'" class="answer-selector">
-                      <label v-for="opt in subQ.options" :key="opt.label" class="answer-option">
-                        <input type="radio" :value="opt.label" v-model="subQ.answer" :name="`sub-answer-${index}`">
-                        {{ opt.label }}
-                      </label>
-                    </div>
-
-                    <!-- 多选题答案 -->
-                    <div v-else-if="subQ.type === 'multiple'" class="answer-selector">
-                      <label v-for="opt in subQ.options" :key="opt.label" class="answer-option">
-                        <input type="checkbox" :value="opt.label" v-model="subQ.answer" :name="`sub-answer-${index}`">
-                        {{ opt.label }}
-                      </label>
-                    </div>
-
                     <!-- 判断题答案 -->
-                    <div v-else-if="subQ.type === 'judgment'" class="answer-selector">
+                    <div v-if="subQ.type === 'judgment'" class="answer-selector">
                       <label class="answer-option">
                         <input type="radio" value="true" v-model="subQ.answer" :name="`sub-answer-${index}`">
                         正确
@@ -292,6 +430,34 @@
                   <label>选项设置 <span class="required">*</span></label>
                   <div class="options-container">
                     <div v-for="(option, index) in options" :key="option.label" class="option-item">
+                      <!-- 单选题：添加 radio -->
+                      <input
+                        v-if="currentType === 'single'"
+                        type="radio"
+                        :id="`answer-${option.label}`"
+                        :value="option.label"
+                        v-model="singleAnswer"
+                        class="answer-radio"
+                      >
+                      <!-- 多选题：添加 checkbox -->
+                      <input
+                        v-else-if="currentType === 'multiple'"
+                        type="checkbox"
+                        :id="`answer-${option.label}`"
+                        :value="option.label"
+                        v-model="multipleAnswer"
+                        class="answer-checkbox"
+                      >
+                      <!-- 不定项：添加 checkbox -->
+                      <input
+                        v-else-if="currentType === 'uncertain'"
+                        type="checkbox"
+                        :id="`answer-${option.label}`"
+                        :value="option.label"
+                        v-model="uncertainAnswer"
+                        class="answer-checkbox"
+                      >
+
                       <div class="option-label">{{ option.label }}</div>
                       <input
                         type="text"
@@ -326,27 +492,10 @@
               <!-- 答案与解析 -->
               <div class="form-section">
                 <h4>答案与解析</h4>
-                <div class="form-group">
+                <!-- 判断题答案 -->
+                <div v-if="currentType === 'judgment'" class="form-group">
                   <label>正确答案 <span class="required">*</span></label>
-
-                  <!-- 单选题答案 -->
-                  <div v-if="currentType === 'single'" class="answer-selector">
-                    <label v-for="option in options" :key="option.label" class="answer-option">
-                      <input type="radio" :value="option.label" v-model="singleAnswer">
-                      {{ option.label }}
-                    </label>
-                  </div>
-
-                  <!-- 多选题答案 -->
-                  <div v-else-if="currentType === 'multiple'" class="answer-selector">
-                    <label v-for="option in options" :key="option.label" class="answer-option">
-                      <input type="checkbox" :value="option.label" v-model="multipleAnswer">
-                      {{ option.label }}
-                    </label>
-                  </div>
-
-                  <!-- 判断题答案 -->
-                  <div v-else-if="currentType === 'judgment'" class="answer-selector">
+                  <div class="answer-selector">
                     <label class="answer-option">
                       <input type="radio" value="true" v-model="singleAnswer">
                       正确
@@ -356,16 +505,17 @@
                       错误
                     </label>
                   </div>
+                </div>
 
-                  <!-- 简答题答案 -->
-                  <div v-else>
-                    <textarea
-                      v-model="textAnswer"
-                      placeholder="请输入参考答案，最多2000字符"
-                      rows="4"
-                      maxlength="2000"
-                    ></textarea>
-                  </div>
+                <!-- 简答题答案 -->
+                <div v-if="currentType === 'essay'" class="form-group">
+                  <label>参考答案 <span class="required">*</span></label>
+                  <textarea
+                    v-model="textAnswer"
+                    placeholder="请输入参考答案，最多2000字符"
+                    rows="4"
+                    maxlength="2000"
+                  ></textarea>
                 </div>
 
                 <div class="form-group">
@@ -435,6 +585,9 @@
                   <li><strong>知识点搜索：</strong>支持按关键词实时搜索知识点，搜索结果仍然按科目分组展示</li>
                   <li><strong>连续录入保持：</strong>使用"保存并继续添加"功能时，知识点选择会保持，便于批量录入同类试题</li>
                   <li><strong>知识点展示：</strong>表格视图中多个知识点用"、"分隔显示；预览视图中以标签形式展示，支持鼠标悬停交互</li>
+                  <li><strong>题型选择规则：</strong>题型选择根据当前选择的科目动态加载，仅显示该科目在题型管理中配置的启用题型，按排序号升序排列</li>
+                  <li><strong>题型名称显示：</strong>使用题型配置中的"外部显示名称"，支持不同科目使用不同的题型名称（如科目A显示"单项选择题"，科目B显示"单选题"）</li>
+                  <li><strong>题型配置关联：</strong>若科目未配置任何题型，试题添加页面提示"当前科目暂无可用题型，请先在题型管理中配置"；科目切换时自动重置题型为第一个可用题型</li>
                 </ul>
               </div>
             </section>
@@ -463,6 +616,12 @@
                     <td>提供试题来源、年份、级别、难度的辅助筛选</td>
                     <td>试题来源：历年真题/模拟试题/自定义；年份：≥2000的整数；级别：基础/中级/高级；难度：简单/中等/困难</td>
                     <td>P1</td>
+                  </tr>
+                  <tr>
+                    <td>题型选择</td>
+                    <td>根据选中的科目动态加载该科目配置的题型列表</td>
+                    <td>仅显示状态为"启用"的题型；按排序号升序排列；使用外部显示名称；科目未选择时显示"请先选择科目"；科目未配置题型时显示"当前科目暂无可用题型，请先在题型管理中配置"；科目切换时自动重置为第一个可用题型</td>
+                    <td>P0</td>
                   </tr>
                   <tr>
                     <td>题型切换</td>
@@ -772,6 +931,24 @@
                       <td>搜索结果实时过滤</td>
                       <td>应仅显示名称包含"微分"的知识点，仍按科目分组展示；若无匹配结果显示"未找到匹配的知识点"</td>
                     </tr>
+                    <tr>
+                      <td>AC-15</td>
+                      <td>用户选择科目"财务战略管理"</td>
+                      <td>该科目在题型管理中配置了单选题、多选题、简答题（按此顺序），所有题型均为启用状态</td>
+                      <td>题型选择区域应显示3个单选按钮，显示名称分别为该科目配置的外部显示名称（如"单项选择题"、"多项选择题"、"简答题"），默认选中第一个题型</td>
+                    </tr>
+                    <tr>
+                      <td>AC-16</td>
+                      <td>用户选择科目"管理会计"</td>
+                      <td>该科目在题型管理中将单选题的外部显示名称配置为"单选"，多选题配置为"多选"</td>
+                      <td>题型选择区域应显示自定义名称"单选"和"多选"，而非默认的"单选题"和"多选题"</td>
+                    </tr>
+                    <tr>
+                      <td>AC-17</td>
+                      <td>用户选择科目"税务筹划"</td>
+                      <td>该科目在题型管理中未配置任何题型</td>
+                      <td>题型选择区域应显示提示"当前科目暂无可用题型，请先在题型管理中配置"，无法选择题型，试题保存按钮应禁用</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -806,6 +983,7 @@
     <!-- 知识点选择弹窗 -->
     <KnowledgePointSelectModal
       :visible="knowledgePointModalVisible"
+      :project-id="filter.projectId"
       :subject-id="filter.subjectId"
       :selected-ids="selectedKnowledgePointIds"
       @update:visible="knowledgePointModalVisible = $event"
@@ -815,30 +993,44 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import AppLayout from '@/components/Layout/AppLayout.vue'
 import TabNavigation from '@/components/Tab/TabNavigation.vue'
 import KnowledgePointSelectModal from '@/components/KnowledgePoint/KnowledgePointSelectModal.vue'
 import PaymentRuleSelector from '@/components/PaymentRuleSelector.vue'
+
 import { useProjectStore } from '@/stores/project'
 import { useQuestionStore } from '@/stores/question'
 import { useChapterStore } from '@/stores/chapter'
+import { usePaperStore } from '@/stores/paper'
 import { useKnowledgePointStore } from '@/stores/knowledgePoint'
+import { useQuestionTypeStore } from '@/stores/questionType'
 import { useToast } from '@/composables/useToast'
 import type { QuestionFilter, QuestionForm, QuestionType, QuestionOption, SubQuestion } from './types'
+import { toShortType } from './types'
 
 const router = useRouter()
 const route = useRoute()
 const projectStore = useProjectStore()
 const questionStore = useQuestionStore()
 const chapterStore = useChapterStore()
+const paperStore = usePaperStore()
 const knowledgePointStore = useKnowledgePointStore()
+const questionTypeStore = useQuestionTypeStore()
 const { showToast } = useToast()
 
 // 编辑模式
 const isEditMode = computed(() => !!route.params.id)
 const editingQuestionId = ref<string | null>(null)
+
+// 从路由参数获取初始项目和科目
+const initialProjectId = computed(() => route.query.projectId as string || '')
+const initialSubjectId = computed(() => route.query.subjectId as string || '')
+const initialChapterId = computed(() => route.query.chapterId as string || '')
+const initialPaperId = computed(() => route.query.paperId as string || '')
+
+
 
 const tabs = [
   { key: 'prototype', label: '原型展示', icon: '🎨' },
@@ -846,7 +1038,33 @@ const tabs = [
   { key: 'style-guide', label: '样式指南', icon: '🎯' }
 ]
 
-// 编辑模式下加载试题数据
+// 筛选条件（默认试题来源为试题管理）
+const filter = ref<QuestionFilter>({
+  source: 'question-management',
+  paperId: '',
+  year: new Date().getFullYear().toString(), // 默认当前年份
+  difficulty: '', // 默认全部难度
+  frequency: '' // 默认请选择频次
+})
+
+// 章节树状态
+const chapterTreeVisible = ref(false)
+const chapterSearchText = ref('')
+const selectedChapterId = ref('')
+const selectedChapterName = ref('')
+const expandedSections = ref<Set<string>>(new Set<string>())
+
+// 记录当前选择章节的isChapterPractice属性
+const isChapterPractice = ref(false)
+
+// 项目-科目-章节选择器状态
+const projectTreeVisible = ref(false)
+const projectSearchText = ref('')
+const selectedProjectName = ref('')
+const expandedProjects = ref<Set<string>>(new Set<string>())
+const expandedSubjects = ref<Set<string>>(new Set<string>())
+
+// 编辑模式下加载试题数据或从路由参数获取初始值
 onMounted(() => {
   if (isEditMode.value) {
     const questionId = route.params.id as string
@@ -863,7 +1081,7 @@ onMounted(() => {
       filter.value.difficulty = existingQuestion.difficulty
 
       // 回填知识点
-      selectedKnowledgePointIds.value = existingQuestion.knowledgePointIds ? [...existingQuestion.knowledgePointIds] : []
+      selectedKnowledgePointIds.value = existingKnowledgePointIds ? [...existingKnowledgePointIds] : []
 
       // 回填收费规则
       paymentRuleId.value = existingQuestion.paymentRuleId || ''
@@ -900,11 +1118,143 @@ onMounted(() => {
       showToast('未找到试题', { type: 'error' })
       router.push('/question-management')
     }
+  } else {
+    // 非编辑模式，从路由参数获取初始项目、科目、章节、试卷
+        // 默认选择逻辑：如果URL有参数则使用，否则选择第一个子项
+        
+        // 1. 处理项目
+        if (initialProjectId.value) {
+          filter.value.projectId = initialProjectId.value
+        } else if (chapterStore.projectTree.length > 0) {
+          // 没有项目参数，选择第一个项目
+          filter.value.projectId = chapterStore.projectTree[0].id
+        }
+        
+        // 2. 处理科目
+        if (initialSubjectId.value) {
+          // 如果没有projectId，根据subjectId查找对应的projectId
+          if (!filter.value.projectId) {
+            const subject = chapterStore.projectTree.find(p => p.subjects.some(s => s.id === initialSubjectId.value))
+            if (subject) {
+              filter.value.projectId = subject.id
+            }
+          }
+          filter.value.subjectId = initialSubjectId.value
+        } else if (filter.value.projectId) {
+          // 没有科目参数，但有项目参数，选择第一个科目
+          const project = chapterStore.projectTree.find(p => p.id === filter.value.projectId)
+          if (project && project.subjects.length > 0) {
+            filter.value.subjectId = project.subjects[0].id
+          }
+        }
+        
+        // 3. 处理章节
+        if (initialChapterId.value) {
+          filter.value.chapterId = initialChapterId.value
+          // 设置章节名称和isChapterPractice属性
+          const chapter = chapterStore.chapters.find(c => c.id === initialChapterId.value)
+          if (chapter) {
+            selectedChapterName.value = chapter.name
+            isChapterPractice.value = chapter.isChapterPractice || false
+          }
+        } else if (filter.value.subjectId) {
+          // 没有章节参数，但有科目参数，选择第一个章节
+          const chapters = chapterStore.chapters.filter(c => c.subjectId === filter.value.subjectId)
+          if (chapters.length > 0) {
+            filter.value.chapterId = chapters[0].id
+            selectedChapterName.value = chapters[0].name
+            isChapterPractice.value = chapters[0].isChapterPractice || false
+          }
+        }
+        
+        // 4. 处理试卷
+        if (initialPaperId.value) {
+          filter.value.paperId = initialPaperId.value
+        } else if (filter.value.subjectId && !isChapterPractice.value) {
+          // 没有试卷参数，但有科目参数且不是章节练习，选择第一个试卷
+          const chapters = chapterStore.chapters.filter(c => c.subjectId === filter.value.subjectId)
+          if (chapters.length > 0) {
+            const chapterIds = chapters.map(c => c.id)
+            const papers = paperStore.papers.filter(p => chapterIds.includes(p.chapterId))
+            if (papers.length > 0) {
+              filter.value.paperId = papers[0].id
+            }
+          }
+        }
   }
 })
 
-// 筛选条件
-const filter = ref<QuestionFilter>({})
+// 监听filter对象变化，确保选择框正确响应
+watch(filter, (newFilter) => {
+  console.log('filter对象变化：', newFilter)
+  console.log('projects计算属性：', projects.value)
+  console.log('filteredSubjects计算属性：', filteredSubjects.value)
+}, { deep: true })
+
+// 监听路由参数变化，确保选择框正确响应
+watch([initialProjectId, initialSubjectId, initialChapterId, initialPaperId], ([newProjectId, newSubjectId, newChapterId, newPaperId]) => {
+  console.log('路由参数变化：', { newProjectId, newSubjectId, newChapterId, newPaperId })
+  
+  // 1. 处理项目
+  if (newProjectId) {
+    filter.value.projectId = newProjectId
+  } else if (chapterStore.projectTree.length > 0 && !filter.value.projectId) {
+    // 没有项目参数且当前没有项目选择，选择第一个项目
+    filter.value.projectId = chapterStore.projectTree[0].id
+  }
+  
+  // 2. 处理科目
+  if (newSubjectId) {
+    // 如果没有projectId，根据subjectId查找对应的projectId
+    if (!filter.value.projectId) {
+      const subject = chapterStore.projectTree.find(p => p.subjects.some(s => s.id === newSubjectId))
+      if (subject) {
+        filter.value.projectId = subject.id
+      }
+    }
+    filter.value.subjectId = newSubjectId
+  } else if (filter.value.projectId && !filter.value.subjectId) {
+    // 没有科目参数，但有项目参数且当前没有科目选择，选择第一个科目
+    const project = chapterStore.projectTree.find(p => p.id === filter.value.projectId)
+    if (project && project.subjects.length > 0) {
+      filter.value.subjectId = project.subjects[0].id
+    }
+  }
+  
+  // 3. 处理章节
+  if (newChapterId) {
+    filter.value.chapterId = newChapterId
+    // 设置章节名称和isChapterPractice属性
+    const chapter = chapterStore.chapters.find(c => c.id === newChapterId)
+    if (chapter) {
+      selectedChapterName.value = chapter.name
+      isChapterPractice.value = chapter.isChapterPractice || false
+    }
+  } else if (filter.value.subjectId && !filter.value.chapterId) {
+    // 没有章节参数，但有科目参数且当前没有章节选择，选择第一个章节
+    const chapters = chapterStore.chapters.filter(c => c.subjectId === filter.value.subjectId)
+    if (chapters.length > 0) {
+      filter.value.chapterId = chapters[0].id
+      selectedChapterName.value = chapters[0].name
+      isChapterPractice.value = chapters[0].isChapterPractice || false
+    }
+  }
+  
+  // 4. 处理试卷
+  if (newPaperId) {
+    filter.value.paperId = newPaperId
+  } else if (filter.value.subjectId && !isChapterPractice.value && !filter.value.paperId) {
+    // 没有试卷参数，但有科目参数且不是章节练习且当前没有试卷选择，选择第一个试卷
+    const chapters = chapterStore.chapters.filter(c => c.subjectId === filter.value.subjectId)
+    if (chapters.length > 0) {
+      const chapterIds = chapters.map(c => c.id)
+      const papers = paperStore.papers.filter(p => chapterIds.includes(p.chapterId))
+      if (papers.length > 0) {
+        filter.value.paperId = papers[0].id
+      }
+    }
+  }
+}, { immediate: true })
 
 // 知识点多选
 const selectedKnowledgePointIds = ref<string[]>([])
@@ -915,14 +1265,46 @@ const paymentRuleId = ref<string>('')
 // 知识点选择弹窗状态
 const knowledgePointModalVisible = ref(false)
 
-// 题型列表
-const questionTypes = [
-  { value: 'single', label: '单选题' },
-  { value: 'multiple', label: '多选题' },
-  { value: 'judgment', label: '判断题' },
-  { value: 'essay', label: '简答题' },
-  { value: 'combination', label: '组合题' }
-]
+
+
+/**
+ * 可用题型列表（根据当前科目动态加载）
+ */
+const availableQuestionTypes = computed(() => {
+  if (!filter.value.subjectId) {
+    return []
+  }
+
+  // 从题型管理系统获取当前科目配置的题型
+  const questionTypes = questionTypeStore
+    .getQuestionTypesBySubject(filter.value.subjectId)
+    .sort((a, b) => a.order - b.order) // 按排序号升序排列
+
+  // 映射为下拉选项格式
+  return questionTypes
+    .map(qt => {
+      const shortType = toShortType(qt.internalType)
+      if (!shortType) return null
+      return {
+        value: shortType,
+        label: qt.displayName // 使用外部显示名称
+      }
+    })
+    .filter(item => item !== null) as Array<{ value: QuestionType; label: string }>
+})
+
+/**
+ * 年份选项（动态计算：当前年份±5年）
+ */
+const yearOptions = computed(() => {
+  const currentYear = new Date().getFullYear()
+  const years: number[] = []
+  // 从当前年份+5到当前年份-5，降序排列
+  for (let year = currentYear + 5; year >= currentYear - 5; year--) {
+    years.push(year)
+  }
+  return years
+})
 
 // 当前题型
 const currentType = ref<QuestionType>('single')
@@ -933,7 +1315,7 @@ const questionForm = ref<QuestionForm>({
   subjectId: '',
   chapterId: '',
   type: 'single',
-  source: 'custom',
+  source: 'question-management', // 默认为试题管理
   stem: '',
   answer: '',
   explanation: ''
@@ -950,6 +1332,7 @@ const options = ref<QuestionOption[]>([
 // 答案（常规题型）
 const singleAnswer = ref('')
 const multipleAnswer = ref<string[]>([])
+const uncertainAnswer = ref<string[]>([])
 const textAnswer = ref('')
 
 // 组合题相关
@@ -957,11 +1340,12 @@ const mainStem = ref('')
 const subQuestions = ref<SubQuestion[]>([])
 
 // 计算属性
-const projects = computed(() => projectStore.mockProjects)
+const projects = computed(() => chapterStore.projectTree)
 
 const filteredSubjects = computed(() => {
   if (!filter.value.projectId) return []
-  return projectStore.mockSubjects.filter(s => s.projectId === filter.value.projectId)
+  const project = chapterStore.projectTree.find(p => p.id === filter.value.projectId)
+  return project ? project.subjects : []
 })
 
 const filteredChapters = computed(() => {
@@ -972,6 +1356,22 @@ const filteredChapters = computed(() => {
 const filteredKnowledgePoints = computed(() => {
   if (!filter.value.subjectId) return []
   return knowledgePointStore.getKnowledgePointsBySubject(filter.value.subjectId).value
+})
+
+const filteredSections = computed(() => {
+  if (!filter.value.subjectId) return []
+  // 获取当前科目下的所有章节
+  const chapters = chapterStore.chapters.filter(c => c.subjectId === filter.value.subjectId)
+  // 获取这些章节下的所有小节
+  return chapterStore.sections.filter(s => chapters.some(c => c.id === s.chapterId))
+})
+
+const filteredPapers = computed(() => {
+  if (!filter.value.subjectId) return []
+  // 获取当前科目下的所有章节
+  const chapters = chapterStore.chapters.filter(c => c.subjectId === filter.value.subjectId)
+  // 获取这些章节下的所有试卷
+  return paperStore.papers.filter(p => chapters.some(c => c.id === p.chapterId))
 })
 
 /**
@@ -996,14 +1396,110 @@ function onProjectChange() {
 
 function onSubjectChange() {
   filter.value.chapterId = ''
+  filter.value.paperId = ''
+  selectedChapterId.value = ''
+  selectedChapterName.value = ''
+  expandedSections.value.clear()
+  // 重置isChapterPractice状态
+  isChapterPractice.value = false
+
+  // 重置题型：选择第一个可用题型，如果没有则保持当前值
+  if (availableQuestionTypes.value.length > 0) {
+    const firstType = availableQuestionTypes.value[0].value
+    if (!availableQuestionTypes.value.some(t => t.value === currentType.value)) {
+      currentType.value = firstType
+    }
+  }
 }
+
+// 章节树方法
+function toggleChapterTreeVisible() {
+  chapterTreeVisible.value = !chapterTreeVisible.value
+}
+
+
+
+function toggleSection(sectionId: string) {
+  if (expandedSections.value.has(sectionId)) {
+    expandedSections.value.delete(sectionId)
+  } else {
+    expandedSections.value.add(sectionId)
+  }
+}
+
+
+
+function getSubSectionsBySection(sectionId: string) {
+  return chapterStore.subSections.filter(subSec => subSec.sectionId === sectionId)
+}
+
+
+
+function selectChapterItem(item: any) {
+  selectedChapterId.value = item.id
+  selectedChapterName.value = item.name
+  filter.value.chapterId = item.id
+  chapterTreeVisible.value = false
+}
+
+
+
+// 项目-科目-章节选择器方法
+function toggleProjectTreeVisible() {
+  projectTreeVisible.value = !projectTreeVisible.value
+  // 关闭其他下拉框
+  chapterTreeVisible.value = false
+}
+
+function toggleProject(projectId: string) {
+  if (expandedProjects.value.has(projectId)) {
+    expandedProjects.value.delete(projectId)
+  } else {
+    // 只允许一个项目展开
+    expandedProjects.value.clear()
+    expandedProjects.value.add(projectId)
+    // 默认展开第一个科目
+    const project = chapterStore.projectTree.find(p => p.id === projectId)
+    if (project && project.subjects.length > 0) {
+      expandedSubjects.value.clear()
+      expandedSubjects.value.add(project.subjects[0].id)
+    }
+  }
+}
+
+function toggleSubject(subjectId: string) {
+  if (expandedSubjects.value.has(subjectId)) {
+    expandedSubjects.value.delete(subjectId)
+  } else {
+    expandedSubjects.value.add(subjectId)
+  }
+}
+
+function selectChapter(chapter: any) {
+  selectedProjectName.value = `${chapter.projectName} - ${chapter.subjectName} - ${chapter.name}`
+  filter.value.projectId = chapter.projectId
+  filter.value.subjectId = chapter.subjectId
+  filter.value.chapterId = chapter.id
+  // 设置isChapterPractice状态，控制章节和试卷选择器的可见性
+  isChapterPractice.value = chapter.isChapterPractice || false
+  projectTreeVisible.value = false
+}
+
+// 点击外部关闭下拉框
+document.addEventListener('click', (e) => {
+  const target = e.target as HTMLElement
+  if (!target.closest('.tree-select-wrapper')) {
+    chapterTreeVisible.value = false
+    projectTreeVisible.value = false
+  }
+})
 
 /**
  * 打开知识点选择弹窗
  */
 function openKnowledgePointModal() {
-  if (!filter.value.subjectId) {
-    showToast('请先选择科目', { type: 'error' })
+  if (!filter.value.projectId || !filter.value.subjectId) {
+    showToast('请先选择项目和科目', { type: 'error' })
     return
   }
   knowledgePointModalVisible.value = true
@@ -1051,7 +1547,8 @@ function addSubQuestion() {
       { label: 'D', content: '' }
     ],
     answer: '',
-    explanation: ''
+    explanation: '',
+    disabled: false
   }
   subQuestions.value.push(newSubQuestion)
 }
@@ -1059,6 +1556,12 @@ function addSubQuestion() {
 // 组合题：删除小问
 function removeSubQuestion(index: number) {
   subQuestions.value.splice(index, 1)
+}
+
+// 组合题：切换小问禁用状态
+function toggleSubQuestionDisabled(index: number) {
+  const subQ = subQuestions.value[index]
+  subQ.disabled = !subQ.disabled
 }
 
 // 组合题：判断小问是否为客观题
@@ -1210,7 +1713,7 @@ function buildFormData(): QuestionForm {
     subjectId: filter.value.subjectId!,
     chapterId: filter.value.chapterId!,
     type: currentType.value,
-    source: filter.value.source || 'custom',
+    source: filter.value.source || 'question-management', // 默认为试题管理
     year: filter.value.year,
     difficulty: filter.value.difficulty,
     knowledgePointIds: selectedKnowledgePointIds.value.length > 0 ? [...selectedKnowledgePointIds.value] : undefined,
@@ -1236,8 +1739,10 @@ function buildFormData(): QuestionForm {
       formData.options = options.value.map(opt => ({ ...opt }))
       if (currentType.value === 'single') {
         formData.answer = singleAnswer.value
-      } else {
+      } else if (currentType.value === 'multiple') {
         formData.answer = [...multipleAnswer.value]
+      } else if (currentType.value === 'uncertain') {
+        formData.answer = [...uncertainAnswer.value]
       }
     } else if (currentType.value === 'judgment') {
       formData.answer = singleAnswer.value
@@ -1250,26 +1755,37 @@ function buildFormData(): QuestionForm {
 }
 
 function resetForm() {
+  // 保留基本信息字段（项目、科目、章节、年份、难度、频次、收费规则、知识点、试题来源）
+  // 仅清空题目内容相关字段
   questionForm.value = {
     projectId: filter.value.projectId || '',
     subjectId: filter.value.subjectId || '',
     chapterId: filter.value.chapterId || '',
     type: currentType.value,
-    source: filter.value.source || 'custom',
+    source: filter.value.source || 'question-management', // 默认为试题管理
     stem: '',
     answer: '',
     explanation: ''
   }
+
   // 保持知识点选择（支持连续录入）
-  // selectedKnowledgePointIds.value = []
-  // 重置收费规则（连续录入时可能需要调整）
-  paymentRuleId.value = ''
+  // selectedKnowledgePointIds.value 保留不变
+
+  // 保持收费规则（支持连续录入）
+  // paymentRuleId.value 保留不变
+
+  // 保持年份、难度、频次等基础信息
+  // filter.value.year, filter.value.difficulty, filter.value.frequency 保留不变
+
+  // 清空题目内容相关字段
   singleAnswer.value = ''
   multipleAnswer.value = []
+  uncertainAnswer.value = []
   textAnswer.value = ''
   mainStem.value = ''
   subQuestions.value = []
 
+  // 重置选项（如果是客观题）
   if (currentType.value !== 'combination' && isObjectiveQuestion.value) {
     options.value = [
       { label: 'A', content: '' },
@@ -1315,6 +1831,7 @@ function handleSaveAndContinue() {
 watch(currentType, () => {
   singleAnswer.value = ''
   multipleAnswer.value = []
+  uncertainAnswer.value = []
   textAnswer.value = ''
   mainStem.value = ''
   subQuestions.value = []
@@ -1335,8 +1852,138 @@ watch(currentType, () => {
 </script>
 
 <style scoped>
+/* 树状搜索下拉框样式 */
+.tree-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.tree-select-input {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background-color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tree-select-input:hover {
+  border-color: #c0c4cc;
+}
+
+.tree-select-input .arrow {
+  font-size: 12px;
+  color: #909399;
+}
+
+.tree-select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background-color: #fff;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.search-box {
+  padding: 10px;
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.search-input {
+  width: 100%;
+  padding: 6px 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.tree-content {
+  padding: 5px 0;
+}
+
+.tree-item {
+  margin: 2px 0;
+}
+
+.tree-item-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.tree-item-header:hover {
+  background-color: #f5f7fa;
+}
+
+.tree-item.is-active .tree-item-header {
+  background-color: #ecf5ff;
+  color: #667eea;
+}
+
+.tree-item .arrow {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #909399;
+  cursor: pointer;
+}
+
+.tree-item .node-icon {
+  display: inline-block;
+  width: 20px;
+  text-align: center;
+  margin-right: 8px;
+}
+
+.tree-item .name {
+  flex: 1;
+}
+
+.tree-children {
+  padding-left: 24px;
+  display: none;
+}
+
+.tree-item.is-expanded > .tree-children {
+  display: block;
+}
+
+.tree-item.section {
+  font-weight: 500;
+}
+
+.tree-item.subsection {
+  font-size: 13px;
+}
+
+.tree-item.paper {
+  font-size: 13px;
+}
+</style>
+
+<style scoped>
 .tab-panel {
-  padding: 32px;
   animation: fade-in 0.3s ease;
 }
 
@@ -1384,7 +2031,15 @@ watch(currentType, () => {
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+
+.filter-grid-row2 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
@@ -1445,13 +2100,21 @@ watch(currentType, () => {
   font-weight: 600;
 }
 
-.knowledge-points-select {
-  grid-column: 1 / -1;
-}
+/* .knowledge-points-select 已移除 grid-column, 现在正常占用 1 列 */
 
 .form-hint {
   font-size: 12px;
   color: var(--secondary-text);
+}
+
+.empty-hint {
+  padding: 16px;
+  background: #f5f7fa;
+  border: 1px dashed #d8dce5;
+  border-radius: 6px;
+  color: var(--secondary-text);
+  font-size: 13px;
+  text-align: center;
 }
 
 /* 题型选择 */
@@ -1516,10 +2179,32 @@ watch(currentType, () => {
   gap: 12px;
 }
 
-.option-item {
+.option-item,
+.sub-option-item {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 12px;
+  background: #fafcfe;
+  border: 1px solid #e4eaf2;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.option-item:hover,
+.sub-option-item:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.02);
+}
+
+/* 答案选择控件样式 */
+.answer-radio,
+.answer-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: #667eea;
 }
 
 .option-label {
@@ -1661,6 +2346,17 @@ watch(currentType, () => {
   border-radius: 8px;
   margin-bottom: 16px;
   overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.sub-question-card.is-disabled {
+  opacity: 0.6;
+  background: #f5f5f5;
+  border-color: #d0d0d0;
+}
+
+.sub-question-card.is-disabled .sub-question-body {
+  pointer-events: none;
 }
 
 .sub-question-header {
@@ -1676,6 +2372,50 @@ watch(currentType, () => {
   font-weight: 600;
   font-size: 14px;
   color: var(--accent);
+  margin-right: 8px;
+}
+
+.disabled-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: linear-gradient(180deg, #ff9800 0%, #f57c00 100%);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.sub-question-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.toggle-sub-question-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #ffa726;
+  background: #ffffff;
+  color: #f57c00;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-sub-question-btn.active {
+  background: linear-gradient(180deg, #ffa726 0%, #fb8c00 100%);
+  color: #ffffff;
+  border-color: #f57c00;
+}
+
+.toggle-sub-question-btn:hover {
+  background: #fff3e0;
+}
+
+.toggle-sub-question-btn.active:hover {
+  background: linear-gradient(180deg, #ff9800 0%, #f57c00 100%);
 }
 
 .remove-sub-question-btn {
@@ -1945,6 +2685,8 @@ watch(currentType, () => {
 .knowledge-point-display {
   flex: 1;
   min-height: 42px;
+  max-height: 90px;
+  overflow-y: auto;
   padding: 8px 12px;
   background: #ffffff;
   border: 1px solid #dfe3eb;
@@ -2028,8 +2770,18 @@ watch(currentType, () => {
   border-color: #cbd5e0;
 }
 
+/* 响应式布局: 中等屏幕2列 */
+@media (max-width: 1024px) {
+  .filter-grid,
+  .filter-grid-row2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 响应式布局: 小屏幕1列 */
 @media (max-width: 768px) {
-  .filter-grid {
+  .filter-grid,
+  .filter-grid-row2 {
     grid-template-columns: 1fr;
   }
 

@@ -1,18 +1,28 @@
 <template>
   <div class="question-list-panel">
-    <div v-if="questions.length === 0" class="empty-state">
-      <div class="empty-icon">📝</div>
-      <p>还没有添加试题</p>
-      <div class="empty-actions">
-        <button class="btn primary" @click="emit('create-question')">
+    <!-- 固定顶部操作栏 -->
+    <div class="panel-header">
+      <h3 class="panel-title">
+        试题列表
+        <span class="count">(共 {{ questions.length }} 道)</span>
+      </h3>
+      <div class="panel-actions">
+        <button class="btn btn-primary" @click="emit('create-question')">
           ➕ 创建试题
         </button>
-        <button class="btn primary" @click="emit('select-from-bank')">
+        <button class="btn btn-primary" @click="emit('select-from-bank')">
           📚 从题库选择
         </button>
       </div>
     </div>
 
+    <!-- 空状态 -->
+    <div v-if="questions.length === 0" class="empty-state">
+      <div class="empty-icon">📝</div>
+      <p>还没有添加试题，点击上方按钮开始添加</p>
+    </div>
+
+    <!-- 试题列表 -->
     <div v-else class="questions-content">
       <div class="question-list">
         <div
@@ -30,8 +40,11 @@
               {{ getQuestionTypeName(examQuestion.questionId) }}
             </div>
             <div class="question-content-section">
-              <div class="question-title">
-                {{ getQuestionStem(examQuestion.questionId) }}
+              <div class="question-title-row">
+                <div class="question-title">
+                  {{ getQuestionStem(examQuestion.questionId) }}
+                </div>
+                <StatusTag :status="getQuestionData(examQuestion.questionId)?.status" />
               </div>
               <!-- 显示试题选项 (客观题) -->
               <div v-if="isObjectiveQuestion(examQuestion.questionId)" class="question-options">
@@ -46,6 +59,13 @@
               </div>
             </div>
             <div class="question-actions">
+              <button
+                class="action-icon-btn edit"
+                title="编辑试题"
+                @click="emit('edit-question', examQuestion.questionId)"
+              >
+                ✏️
+              </button>
               <button
                 class="action-icon-btn"
                 :title="examQuestion.isOptional ? '设为必答' : '设为选答'"
@@ -76,6 +96,21 @@
               >
                 🗑️
               </button>
+            </div>
+          </div>
+
+          <!-- 知识点列表 -->
+          <div v-if="getKnowledgePoints(examQuestion.questionId).length > 0" class="knowledge-points-section">
+            <div class="knowledge-points-label">知识点:</div>
+            <div class="knowledge-points-list">
+              <div
+                v-for="kp in getKnowledgePoints(examQuestion.questionId)"
+                :key="kp.id"
+                class="knowledge-point-item"
+              >
+                <span class="knowledge-point-name">{{ kp.name }}</span>
+                <StatusTag :status="kp.status" />
+              </div>
             </div>
           </div>
 
@@ -131,6 +166,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useQuestionStore } from '@/stores/question'
+import { useKnowledgePointStore } from '@/stores/knowledgePoint'
+import StatusTag from '@/components/StatusTag.vue'
 import type { ExamQuestion } from '../types'
 
 interface Props {
@@ -145,12 +182,14 @@ interface Emits {
   (e: 'toggle-optional', questionId: string): void
   (e: 'move-up', questionId: string): void
   (e: 'move-down', questionId: string): void
+  (e: 'edit-question', questionId: string): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const questionStore = useQuestionStore()
+const knowledgePointStore = useKnowledgePointStore()
 
 // 展开的题目ID集合
 const expandedQuestions = ref<Set<string>>(new Set())
@@ -214,7 +253,7 @@ function getQuestionData(questionId: string) {
   const examQuestion = props.questions.find(q => q.questionId === questionId)
 
   if (examQuestion && examQuestion.embedded) {
-    // 嵌入式试题：使用本地数据
+    // 嵌入式试题：使用本地数据（新创建的题目，状态为 active）
     return {
       id: examQuestion.questionId,
       type: examQuestion.type,
@@ -223,7 +262,8 @@ function getQuestionData(questionId: string) {
       answer: examQuestion.embedded.answer,
       explanation: examQuestion.embedded.explanation,
       mainStem: examQuestion.embedded.mainStem,
-      subQuestions: examQuestion.embedded.subQuestions
+      subQuestions: examQuestion.embedded.subQuestions,
+      status: 'active' as const // 嵌入式试题默认为 active 状态
     }
   } else {
     // 引用式试题：从题库查询
@@ -258,6 +298,28 @@ function handleScoreChange(questionId: string, event: Event) {
     emit('update-score', questionId, score)
   }
 }
+
+// 获取试题关联的知识点ID列表
+function getKnowledgePointIds(questionId: string): string[] {
+  const examQuestion = props.questions.find(q => q.questionId === questionId)
+
+  if (examQuestion && examQuestion.embedded) {
+    // 嵌入式试题：从 embedded 数据获取
+    return examQuestion.embedded.knowledgePointIds || []
+  } else {
+    // 引用式试题：从题库获取
+    const question = questionStore.getQuestionById(questionId)
+    return question?.knowledgePointIds || []
+  }
+}
+
+// 获取知识点列表（包含名称和状态）
+function getKnowledgePoints(questionId: string) {
+  const knowledgePointIds = getKnowledgePointIds(questionId)
+  return knowledgePointIds
+    .map(kpId => knowledgePointStore.getKnowledgePointById(kpId))
+    .filter(kp => kp !== undefined) // 过滤掉找不到的知识点
+}
 </script>
 
 <style scoped>
@@ -265,8 +327,41 @@ function handleScoreChange(questionId: string, event: Event) {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
-  padding: 24px;
+  overflow: hidden;
   min-height: 400px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-title .count {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--secondary-text);
+}
+
+.panel-actions {
+  display: flex;
+  gap: 12px;
 }
 
 .empty-state {
@@ -284,17 +379,12 @@ function handleScoreChange(questionId: string, event: Event) {
 }
 
 .empty-state p {
-  margin: 0 0 24px;
+  margin: 0;
   font-size: 16px;
 }
 
-.empty-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
 .questions-content {
+  padding: 24px;
   display: flex;
   flex-direction: column;
 }
@@ -364,7 +454,14 @@ function handleScoreChange(questionId: string, event: Event) {
   gap: 12px;
 }
 
+.question-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 .question-title {
+  flex: 1;
   color: var(--primary-text);
   font-size: 14px;
   line-height: 1.6;
@@ -417,6 +514,10 @@ function handleScoreChange(questionId: string, event: Event) {
   transform: scale(1.1);
 }
 
+.action-icon-btn.edit:hover {
+  background: rgba(76, 175, 80, 0.1);
+}
+
 .action-icon-btn.delete:hover {
   background: rgba(239, 83, 80, 0.1);
 }
@@ -424,6 +525,43 @@ function handleScoreChange(questionId: string, event: Event) {
 .action-icon-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+.knowledge-points-section {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e4eaf2;
+}
+
+.knowledge-points-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-text);
+  margin-bottom: 8px;
+}
+
+.knowledge-points-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.knowledge-point-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: #ffffff;
+  border: 1px solid #d1d9e6;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.knowledge-point-name {
+  color: var(--primary-text);
+  font-weight: 500;
 }
 
 .question-meta {
@@ -539,13 +677,13 @@ function handleScoreChange(questionId: string, event: Event) {
   gap: 6px;
 }
 
-.btn.primary {
+.btn-primary {
   background: linear-gradient(180deg, #4f77ff 0%, #2f57e3 100%);
   color: #ffffff;
   border-color: #375edf;
 }
 
-.btn.primary:hover {
+.btn-primary:hover {
   background: linear-gradient(180deg, #4b6ee6 0%, #264acc 100%);
 }
 </style>

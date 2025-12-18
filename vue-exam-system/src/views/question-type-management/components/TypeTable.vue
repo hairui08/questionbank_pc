@@ -1,49 +1,60 @@
 <template>
   <div class="type-list-panel">
     <div class="panel-header">
-      <div class="breadcrumb">{{ projectName }} / {{ subjectName }} / 题型列表</div>
+      <div class="breadcrumb">题型列表</div>
       <button class="btn primary" @click="emit('add-type')">+ 新增题型</button>
     </div>
 
     <table class="type-table">
       <thead>
         <tr>
-          <th style="width: 60px">序号</th>
-          <th>内部题型名称</th>
-          <th>外部显示名称</th>
-          <th>题型描述</th>
-          <th style="width: 80px">排序</th>
-          <th style="width: 100px">状态</th>
-          <th style="width: 240px">操作</th>
+          <th style="width: 10%">排序</th>
+          <th style="width: 20%">内部题型名称</th>
+          <th style="width: 20%">外部显示名称</th>
+          <th style="width: 15%">排序操作</th>
+          <th style="width: 12%">状态</th>
+          <th style="width: 23%">操作</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(type, index) in paginatedData" :key="type.id" class="type-row">
-          <td style="text-align: center">{{ (currentPage - 1) * 10 + index + 1 }}</td>
+        <tr v-for="type in paginatedData" :key="type.id" class="type-row">
+          <td>{{ type.order }}</td>
           <td>{{ type.internalName }}</td>
           <td>{{ type.displayName }}</td>
-          <td>{{ type.description || '-' }}</td>
-          <td>{{ type.order }}</td>
+          <td style="text-align: center">
+            <div class="sort-buttons">
+              <button
+                class="sort-btn"
+                :disabled="isFirstInSubject(type)"
+                @click="emit('move-up', type)"
+                title="上移"
+              >
+                ↑
+              </button>
+              <button
+                class="sort-btn"
+                :disabled="isLastInSubject(type)"
+                @click="emit('move-down', type)"
+                title="下移"
+              >
+                ↓
+              </button>
+            </div>
+          </td>
           <td>
             <span :class="['status', type.status === 'active' ? 'is-active' : 'is-disabled']">
               {{ type.status === 'active' ? '启用' : '禁用' }}
             </span>
           </td>
           <td>
-            <div class="action-group">
-              <button class="btn secondary" @click="emit('edit-type', type)">编辑</button>
-              <button
-                class="btn secondary"
-                @click="emit('toggle-status', type)"
-              >
-                {{ type.status === 'active' ? '禁用' : '启用' }}
-              </button>
-              <button class="btn secondary" @click="emit('delete-type', type)">删除</button>
-            </div>
+            <ActionDropdown
+              :items="getActionMenuItems(type)"
+              @select="(key) => handleActionSelect(key, type)"
+            />
           </td>
         </tr>
         <tr v-if="paginatedData.length === 0">
-          <td colspan="7" style="text-align: center; padding: 40px; color: var(--secondary-text)">
+          <td colspan="6" style="text-align: center; padding: 40px; color: var(--secondary-text)">
             暂无题型配置，点击「新增题型」开始添加
           </td>
         </tr>
@@ -85,13 +96,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { usePagination } from '@/composables/usePagination'
+import ActionDropdown from '@/components/ActionDropdown.vue'
+import type { MenuItem } from '@/components/ActionDropdown.vue'
 import type { QuestionType } from '../types'
 
 // Props
 interface Props {
   types: QuestionType[]
-  projectName: string
-  subjectName: string
 }
 
 const props = defineProps<Props>()
@@ -102,6 +113,8 @@ const emit = defineEmits<{
   'edit-type': [type: QuestionType]
   'delete-type': [type: QuestionType]
   'toggle-status': [type: QuestionType]
+  'move-up': [type: QuestionType]
+  'move-down': [type: QuestionType]
 }>()
 
 // 分页逻辑
@@ -129,6 +142,54 @@ const handleJump = () => {
     goToPage(jumpPageInput.value)
     jumpPageInput.value = ''
   }
+}
+
+/**
+ * 获取操作菜单项
+ */
+const getActionMenuItems = (type: QuestionType): MenuItem[] => {
+  return [
+    { key: 'edit', label: '编辑', icon: '✏️' },
+    {
+      key: 'toggle',
+      label: type.status === 'active' ? '禁用' : '启用',
+      icon: type.status === 'active' ? '🔒' : '✅'
+    },
+    { key: 'delete', label: '删除', icon: '🗑️', danger: true }
+  ]
+}
+
+/**
+ * 处理操作选择
+ */
+const handleActionSelect = (key: string, type: QuestionType) => {
+  switch (key) {
+    case 'edit':
+      emit('edit-type', type)
+      break
+    case 'toggle':
+      emit('toggle-status', type)
+      break
+    case 'delete':
+      emit('delete-type', type)
+      break
+  }
+}
+
+/**
+ * 判断是否是第一个题型
+ */
+const isFirstInSubject = (type: QuestionType): boolean => {
+  const sortedTypes = [...props.types].sort((a, b) => a.order - b.order)
+  return sortedTypes.length > 0 && sortedTypes[0].id === type.id
+}
+
+/**
+ * 判断是否是最后一个题型
+ */
+const isLastInSubject = (type: QuestionType): boolean => {
+  const sortedTypes = [...props.types].sort((a, b) => a.order - b.order)
+  return sortedTypes.length > 0 && sortedTypes[sortedTypes.length - 1].id === type.id
 }
 </script>
 
@@ -178,16 +239,6 @@ const handleJump = () => {
   background: linear-gradient(180deg, #4b6ee6 0%, #264acc 100%);
 }
 
-.btn.secondary {
-  background-color: #ffffff;
-  color: var(--accent);
-  border-color: rgba(0, 102, 204, 0.4);
-}
-
-.btn.secondary:hover {
-  background-color: rgba(0, 102, 204, 0.08);
-}
-
 .type-table {
   width: 100%;
   border-collapse: collapse;
@@ -220,11 +271,6 @@ const handleJump = () => {
   background-color: #f9fbff;
 }
 
-.action-group {
-  display: flex;
-  gap: 6px;
-}
-
 .status {
   display: inline-flex;
   align-items: center;
@@ -244,6 +290,40 @@ const handleJump = () => {
   background-color: #fff3f0;
   color: #cf4a30;
   border: 1px solid rgba(207, 74, 48, 0.3);
+}
+
+/* 排序按钮 */
+.sort-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.sort-btn {
+  width: 32px;
+  height: 28px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sort-btn:hover:not(:disabled) {
+  background: var(--row-hover);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+.sort-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  color: var(--secondary-text);
 }
 
 /* 分页样式 */

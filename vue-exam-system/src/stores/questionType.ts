@@ -3,111 +3,80 @@ import { ref, computed } from 'vue'
 import type {
   QuestionType,
   QuestionTypeFormData,
-  InternalType,
-  ProjectTreeNode
+  InternalType
 } from '@/views/question-type-management/types'
 import { INTERNAL_TYPE_NAMES } from '@/views/question-type-management/types'
-import { useProjectStore } from './project'
 
 export const useQuestionTypeStore = defineStore('questionType', () => {
-  const projectStore = useProjectStore()
-
   // Mock数据
   const questionTypes = ref<QuestionType[]>([
-    // 高级会计师 / 财务战略管理 (s1)
     {
       id: 'qt1',
-      subjectId: 's1',
-      subjectName: '财务战略管理',
-      projectId: 'p1',
-      projectName: '高级会计师',
       internalType: 'essay' as InternalType,
       internalName: '简答题',
       displayName: '案例分析题',
-      description: '结合实际案例进行深度分析',
       order: 1,
       status: 'active',
+      subjectId: 's1', // 财务战略管理
       createdAt: new Date('2025-09-15'),
       updatedAt: new Date('2025-09-15')
     },
     {
       id: 'qt2',
-      subjectId: 's1',
-      subjectName: '财务战略管理',
-      projectId: 'p1',
-      projectName: '高级会计师',
       internalType: 'combination' as InternalType,
       internalName: '组合题',
       displayName: '综合应用题',
-      description: '多知识点综合运用',
       order: 2,
       status: 'active',
+      subjectId: 's1', // 财务战略管理
       createdAt: new Date('2025-09-15'),
       updatedAt: new Date('2025-09-15')
     },
-    // 高级会计师 / 税务风险控制 (s2)
     {
       id: 'qt3',
-      subjectId: 's2',
-      subjectName: '税务风险控制',
-      projectId: 'p1',
-      projectName: '高级会计师',
       internalType: 'essay' as InternalType,
       internalName: '简答题',
       displayName: '简答题',
-      description: '文字论述类题目',
-      order: 1,
+      order: 3,
       status: 'active',
+      subjectId: 's1', // 财务战略管理
       createdAt: new Date('2025-09-15'),
       updatedAt: new Date('2025-09-15')
     },
-    // 中级会计师 / 成本管理实务 (s8)
     {
       id: 'qt4',
-      subjectId: 's8',
-      subjectName: '成本管理实务',
-      projectId: 'p4',
-      projectName: '中级会计师',
       internalType: 'single_choice' as InternalType,
       internalName: '单选题',
       displayName: '单项选择题',
-      description: '四个选项中选择一个正确答案',
-      order: 1,
+      order: 4,
       status: 'active',
+      subjectId: 's2', // 税务风险控制
       createdAt: new Date('2025-05-18'),
       updatedAt: new Date('2025-05-18')
     },
     {
       id: 'qt5',
-      subjectId: 's8',
-      subjectName: '成本管理实务',
-      projectId: 'p4',
-      projectName: '中级会计师',
       internalType: 'multiple_choice' as InternalType,
       internalName: '多选题',
       displayName: '多项选择题',
-      description: '四个选项中选择多个正确答案',
-      order: 2,
+      order: 5,
       status: 'active',
+      subjectId: 's2', // 税务风险控制
       createdAt: new Date('2025-05-18'),
       updatedAt: new Date('2025-05-18')
     },
     {
       id: 'qt6',
-      subjectId: 's8',
-      subjectName: '成本管理实务',
-      projectId: 'p4',
-      projectName: '中级会计师',
       internalType: 'judgment' as InternalType,
       internalName: '判断题',
       displayName: '判断题',
-      description: '判断对错',
-      order: 3,
+      order: 6,
       status: 'disabled',
+      subjectId: 's3', // 内部挖潜优化
       createdAt: new Date('2025-05-18'),
       updatedAt: new Date('2025-05-18')
     },
-    // 中级会计师 / 财务报表编制 (s9) - 25个题型用于测试分页
+    // 25个题型用于测试分页，分配给不同科目
     ...Array.from({ length: 25 }, (_, i) => {
       const types: InternalType[] = [
         'single_choice',
@@ -116,18 +85,16 @@ export const useQuestionTypeStore = defineStore('questionType', () => {
         'essay'
       ] as InternalType[]
       const type = types[i % 4]
+      const subjectIds = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10']
+      const subjectId = subjectIds[i % subjectIds.length]
       return {
         id: `qt${100 + i}`,
-        subjectId: 's9',
-        subjectName: '财务报表编制',
-        projectId: 'p4',
-        projectName: '中级会计师',
         internalType: type,
         internalName: INTERNAL_TYPE_NAMES[type],
         displayName: `题型${i + 1}`,
-        description: `这是第${i + 1}个题型的描述`,
-        order: i + 1,
+        order: i + 7,
         status: (i % 3 !== 0 ? 'active' : 'disabled') as 'active' | 'disabled',
+        subjectId: subjectId,
         createdAt: new Date('2025-05-18'),
         updatedAt: new Date('2025-05-18')
       }
@@ -135,28 +102,17 @@ export const useQuestionTypeStore = defineStore('questionType', () => {
   ])
 
   /**
-   * 项目树数据（从 projectStore 转换）
+   * 获取所有题型列表
    */
-  const projectTree = computed((): ProjectTreeNode[] => {
-    return projectStore.projects.map((project) => ({
-      id: project.id,
-      name: project.name,
-      subjects: projectStore.subjects
-        .filter((subject) => subject.projectId === project.id)
-        .map((subject) => ({
-          id: subject.id,
-          name: subject.name,
-          projectId: subject.projectId,
-          projectName: project.name
-        }))
-    }))
-  })
+  const getAllQuestionTypes = computed(() => questionTypes.value)
 
   /**
    * 根据科目ID获取题型列表
    */
-  const getQuestionTypesBySubject = (subjectId: string) => {
-    return computed(() => questionTypes.value.filter((qt) => qt.subjectId === subjectId))
+  const getQuestionTypesBySubject = (subjectId: string): QuestionType[] => {
+    return questionTypes.value
+      .filter(type => type.subjectId === subjectId && type.status === 'active')
+      .sort((a, b) => a.order - b.order)
   }
 
   /**
@@ -164,35 +120,34 @@ export const useQuestionTypeStore = defineStore('questionType', () => {
    * 包含三重唯一性校验：内部题型、外部名称、排序
    */
   const addQuestionType = (data: QuestionTypeFormData) => {
-    const typesInSubject = questionTypes.value.filter((qt) => qt.subjectId === data.subjectId)
-
-    // 校验内部题型唯一性
-    if (typesInSubject.some((qt) => qt.internalType === data.internalType)) {
-      throw new Error('该内部题型已在当前科目下配置')
+    // 确保subjectId存在
+    if (!data.subjectId) {
+      throw new Error('缺少科目ID')
     }
 
-    // 校验外部名称唯一性
-    if (typesInSubject.some((qt) => qt.displayName === data.displayName.trim())) {
-      throw new Error('外部显示名称在当前科目下重复')
+    // 校验内部题型唯一性（按科目）
+    if (questionTypes.value.some((qt) => qt.internalType === data.internalType && qt.subjectId === data.subjectId)) {
+      throw new Error('该科目下已存在相同的内部题型')
     }
 
-    // 校验排序唯一性
-    if (typesInSubject.some((qt) => qt.order === data.order)) {
-      throw new Error('排序值在当前科目下重复')
+    // 校验外部名称唯一性（按科目）
+    if (questionTypes.value.some((qt) => qt.displayName === data.displayName.trim() && qt.subjectId === data.subjectId)) {
+      throw new Error('该科目下外部显示名称重复')
+    }
+
+    // 校验排序唯一性（按科目）
+    if (questionTypes.value.some((qt) => qt.order === data.order && qt.subjectId === data.subjectId)) {
+      throw new Error('该科目下排序值重复')
     }
 
     const newQuestionType: QuestionType = {
       id: `qt${Date.now()}`,
-      subjectId: data.subjectId,
-      subjectName: data.subjectName,
-      projectId: data.projectId,
-      projectName: data.projectName,
       internalType: data.internalType,
       internalName: INTERNAL_TYPE_NAMES[data.internalType],
       displayName: data.displayName.trim(),
-      description: data.description.trim(),
       order: data.order,
       status: data.status,
+      subjectId: data.subjectId,
       createdAt: new Date(),
       updatedAt: new Date()
     }
@@ -212,21 +167,19 @@ export const useQuestionTypeStore = defineStore('questionType', () => {
     }
 
     const currentType = questionTypes.value[index]
-    const typesInSubject = questionTypes.value.filter(
-      (qt) => qt.subjectId === currentType.subjectId && qt.id !== id
-    )
+    const otherTypes = questionTypes.value.filter((qt) => qt.id !== id)
 
-    // 如果修改了外部名称，校验唯一性
+    // 如果修改了外部名称，校验唯一性（按科目）
     if (updates.displayName && updates.displayName.trim() !== currentType.displayName) {
-      if (typesInSubject.some((qt) => qt.displayName === updates.displayName.trim())) {
-        throw new Error('外部显示名称在当前科目下重复')
+      if (otherTypes.some((qt) => qt.displayName === updates.displayName.trim() && qt.subjectId === currentType.subjectId)) {
+        throw new Error('该科目下外部显示名称重复')
       }
     }
 
-    // 如果修改了排序，校验唯一性
+    // 如果修改了排序，校验唯一性（按科目）
     if (updates.order && updates.order !== currentType.order) {
-      if (typesInSubject.some((qt) => qt.order === updates.order)) {
-        throw new Error('排序值在当前科目下重复')
+      if (otherTypes.some((qt) => qt.order === updates.order && qt.subjectId === currentType.subjectId)) {
+        throw new Error('该科目下排序值重复')
       }
     }
 
@@ -234,7 +187,6 @@ export const useQuestionTypeStore = defineStore('questionType', () => {
     questionTypes.value[index] = {
       ...currentType,
       ...(updates.displayName && { displayName: updates.displayName.trim() }),
-      ...(updates.description !== undefined && { description: updates.description.trim() }),
       ...(updates.order && { order: updates.order }),
       ...(updates.status && { status: updates.status }),
       updatedAt: new Date()
@@ -269,13 +221,179 @@ export const useQuestionTypeStore = defineStore('questionType', () => {
     questionTypes.value[index].updatedAt = new Date()
   }
 
+  /**
+   * 上移题型
+   */
+  const moveUp = (id: string) => {
+    const currentType = questionTypes.value.find((qt) => qt.id === id)
+    if (!currentType) {
+      throw new Error('题型不存在')
+    }
+
+    // 获取所有题型,按 order 排序
+    const allTypes = questionTypes.value.sort((a, b) => a.order - b.order)
+
+    const currentIndex = allTypes.findIndex((qt) => qt.id === id)
+
+    // 如果已经是第一个,不能上移
+    if (currentIndex === 0) {
+      throw new Error('已经是第一个题型,无法上移')
+    }
+
+    // 交换 order 值
+    const prevType = allTypes[currentIndex - 1]
+    const tempOrder = currentType.order
+    currentType.order = prevType.order
+    prevType.order = tempOrder
+
+    // 更新时间戳
+    currentType.updatedAt = new Date()
+    prevType.updatedAt = new Date()
+  }
+
+  /**
+   * 下移题型
+   */
+  const moveDown = (id: string) => {
+    const currentType = questionTypes.value.find((qt) => qt.id === id)
+    if (!currentType) {
+      throw new Error('题型不存在')
+    }
+
+    // 获取所有题型,按 order 排序
+    const allTypes = questionTypes.value.sort((a, b) => a.order - b.order)
+
+    const currentIndex = allTypes.findIndex((qt) => qt.id === id)
+
+    // 如果已经是最后一个,不能下移
+    if (currentIndex === allTypes.length - 1) {
+      throw new Error('已经是最后一个题型,无法下移')
+    }
+
+    // 交换 order 值
+    const nextType = allTypes[currentIndex + 1]
+    const tempOrder = currentType.order
+    currentType.order = nextType.order
+    nextType.order = tempOrder
+
+    // 更新时间戳
+    currentType.updatedAt = new Date()
+    nextType.updatedAt = new Date()
+  }
+
+  // 构建项目树数据，实时计算题型数量
+  const projectTree = computed(() => {
+    // 计算每个科目下的题型数量
+    const getSubjectTypeCount = (subjectId: string): number => {
+      return questionTypes.value.filter(type => type.subjectId === subjectId).length
+    }
+
+    return [
+      {
+        id: 'p1',
+        name: '高级会计师',
+        icon: '📁',
+        count: 3,
+        subjects: [
+          {
+            id: 's1',
+            name: '财务战略管理',
+            icon: '📚',
+            count: getSubjectTypeCount('s1')
+          },
+          {
+            id: 's2',
+            name: '税务风险控制',
+            icon: '📚',
+            count: getSubjectTypeCount('s2')
+          },
+          {
+            id: 's3',
+            name: '内部挖潜优化',
+            icon: '📚',
+            count: getSubjectTypeCount('s3')
+          }
+        ]
+      },
+      {
+        id: 'p2',
+        name: '高级经济师',
+        icon: '📁',
+        count: 2,
+        subjects: [
+          {
+            id: 's4',
+            name: '经济基础知识',
+            icon: '📚',
+            count: getSubjectTypeCount('s4')
+          },
+          {
+            id: 's5',
+            name: '工商管理',
+            icon: '📚',
+            count: getSubjectTypeCount('s5')
+          }
+        ]
+      },
+      {
+        id: 'p3',
+        name: '中级经济师',
+        icon: '📁',
+        count: 2,
+        subjects: [
+          {
+            id: 's6',
+            name: '经济基础知识',
+            icon: '📚',
+            count: getSubjectTypeCount('s6')
+          },
+          {
+            id: 's7',
+            name: '金融专业',
+            icon: '📚',
+            count: getSubjectTypeCount('s7')
+          }
+        ]
+      },
+      {
+        id: 'p4',
+        name: '中级会计师',
+        icon: '📁',
+        count: 3,
+        subjects: [
+          {
+            id: 's8',
+            name: '会计实务',
+            icon: '📚',
+            count: getSubjectTypeCount('s8')
+          },
+          {
+            id: 's9',
+            name: '财务管理',
+            icon: '📚',
+            count: getSubjectTypeCount('s9')
+          },
+          {
+            id: 's10',
+            name: '经济法',
+            icon: '📚',
+            count: getSubjectTypeCount('s10')
+          }
+        ]
+      }
+    ]
+  })
+
   return {
     questionTypes,
-    projectTree,
+    getAllQuestionTypes,
     getQuestionTypesBySubject,
+    projectTree,
     addQuestionType,
     updateQuestionType,
     deleteQuestionType,
-    toggleQuestionTypeStatus
+    toggleQuestionTypeStatus,
+    moveUp,
+    moveDown
   }
 })
